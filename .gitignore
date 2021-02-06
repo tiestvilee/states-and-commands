@@ -1,0 +1,13 @@
+# Gradle
+.gradle/
+target/
+buildSrc/build
+
+# IntelliJ IDEA
+.idea/*
+!.idea/runConfigurations/
+!.idea/codeStyles/
+!.idea/dataSources.local.xml
+!.idea/dataSources.xml
+out/
+*.imla
