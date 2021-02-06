@@ -2,15 +2,35 @@ package statemachine
 
 import functional.ErrorCode
 import functional.Result
-import functional.flatMap
+import functional.map
 import kotlin.reflect.KClass
 
-interface State {
+abstract class State {
+
+    abstract fun getTransitionFunction(transitionClass: KClass<out Transition>): ((State, Transition) -> State)?
+
     fun applyTransition(
         transition: Transition,
         applied: ChainableApplication? = null
-    ): Result<ErrorCode, ChainableApplication>
+    ): Result<ErrorCode, ChainableApplication> {
+        return getTransitionFunction(transition::class)?.let {
+            Result.success(ChainableApplication(it(this, transition), transition, applied))
+        } ?: Result.failure(StateTransitionError(this, transition))
+    }
+
+    inline fun <reified S : State, reified T : Transition> applyTransition(tryThis: (S) -> Result<ErrorCode, T>): Result<ErrorCode, Application> {
+        return if (this is S)
+            getTransitionFunction(T::class)?.let { fn ->
+                tryThis(this)
+                    .map { transition ->
+                        ChainableApplication(fn(this, transition), transition)
+                    }
+            } ?: Result.failure(StateTransitionClassError(this, T::class))
+        else
+            Result.failure(WrongStateError(this, S::class))
+    }
 }
+
 interface Transition
 
 open class Application(
@@ -29,11 +49,11 @@ data class WrongStateError(val actualState: State, val expectedState: KClass<out
 data class StateTransitionError(val state: State, val transition: Transition) : ErrorCode
 data class StateTransitionClassError(val state: State, val transitionClass: KClass<out Transition>) : ErrorCode
 
-fun Result<ErrorCode, ChainableApplication>.applyTransition(transition: Transition): Result<ErrorCode, ChainableApplication> {
-    return this.flatMap {
-        it.new.applyTransition(transition, it)
-    }
-}
+//inline fun <reified T : Transition> Result<ErrorCode, ChainableApplication>.applyTransition(transition: T): Result<ErrorCode, ChainableApplication> {
+//    return this.flatMap {
+//        it.new.applyTransition<T>(transition, it)
+//    }
+//}
 
 //
 //inline fun <reified S : State, reified T : Transition> Result<ErrorCode, ChainableApplication>.applyTransition(noinline tryThis: (S) -> Result<ErrorCode, T>): Result<ErrorCode, Application> {

@@ -4,7 +4,10 @@ import functional.Result.Companion.failure
 import functional.Result.Companion.success
 import functional.orThrow
 import org.junit.Test
-import statemachine.*
+import statemachine.ChainableApplication
+import statemachine.StateTransitionClassError
+import statemachine.StateTransitionError
+import statemachine.WrongStateError
 import java.math.BigDecimal
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -36,22 +39,6 @@ class AccountStateTest {
                 WelcomeMessageSent(emailTxn)
             ),
             finalState
-        )
-    }
-
-    @Test
-    fun `chained transitions`() {
-        val nextState = InitialState
-            .applyTransition(Created(emailAddress))
-            .applyTransition(WelcomeMessageSent(emailTxn))
-
-        assertEquals(
-            ChainableApplication(
-                AccountOpen(openingBalance),
-                WelcomeMessageSent(emailTxn),
-                ChainableApplication(NeedsWelcomeEmail(emailAddress), Created(emailAddress))
-            ),
-            nextState.orThrow()
         )
     }
 
@@ -141,6 +128,22 @@ class AccountStateTest {
             nextState
         )
     }
+//
+//    @Test
+//    fun `chained transitions`() {
+//        val nextState = InitialState
+//            .applyTransition(Created(emailAddress))
+//            .applyTransition(WelcomeMessageSent(emailTxn))
+//
+//        assertEquals(
+//            ChainableApplication(
+//                AccountOpen(openingBalance),
+//                WelcomeMessageSent(emailTxn),
+//                ChainableApplication(NeedsWelcomeEmail(emailAddress), Created(emailAddress))
+//            ),
+//            nextState.orThrow()
+//        )
+//    }
 
 //    @Test
 //    fun `chained to a doSomething`() {
