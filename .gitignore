@@ -3,6 +3,8 @@
 target/
 buildSrc/build
 
+build/
+
 # IntelliJ IDEA
 .idea/*
 !.idea/runConfigurations/
