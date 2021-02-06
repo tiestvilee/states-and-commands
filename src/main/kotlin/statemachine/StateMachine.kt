@@ -8,14 +8,23 @@ import kotlin.reflect.KClass
 interface State {
     fun applyTransition(
         transition: Transition,
-        applied: List<Transition> = emptyList()
+        applied: ChainableApplication? = null
     ): Result<ErrorCode, ChainableApplication>
 }
 
 interface Transition
 
-open class Application(val new: State, val applied: List<Transition>)
-class ChainableApplication(new: State, applied: List<Transition>) : Application(new, applied)
+open class Application(
+    open val new: State,
+    open val applied: Transition,
+    open val chainedApplication: ChainableApplication? = null
+)
+
+data class ChainableApplication(
+    override val new: State,
+    override val applied: Transition,
+    override val chainedApplication: ChainableApplication? = null
+) : Application(new, applied, chainedApplication)
 
 data class WrongStateError(val state: State) : ErrorCode
 data class StateTransitionError(val state: State, val transition: Transition) : ErrorCode
@@ -23,7 +32,7 @@ data class StateTransitionClassError(val state: State, val transitionClass: KCla
 
 fun Result<ErrorCode, ChainableApplication>.applyTransition(transition: Transition): Result<ErrorCode, ChainableApplication> {
     return this.flatMap {
-        it.new.applyTransition(transition, it.applied)
+        it.new.applyTransition(transition, it)
     }
 }
 

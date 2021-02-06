@@ -23,7 +23,7 @@ class AccountStateTest {
         assertEquals(
             ChainableApplication(
                 NeedsWelcomeEmail(emailAddress),
-                listOf(Created(emailAddress))
+                Created(emailAddress)
             ),
             nextState
         )
@@ -33,7 +33,7 @@ class AccountStateTest {
         assertEquals(
             ChainableApplication(
                 AccountOpen(openingBalance),
-                listOf(WelcomeMessageSent(emailTxn))
+                WelcomeMessageSent(emailTxn)
             ),
             finalState
         )
@@ -48,7 +48,8 @@ class AccountStateTest {
         assertEquals(
             ChainableApplication(
                 AccountOpen(openingBalance),
-                listOf(Created(emailAddress), WelcomeMessageSent(emailTxn))
+                WelcomeMessageSent(emailTxn),
+                ChainableApplication(NeedsWelcomeEmail(emailAddress), Created(emailAddress))
             ),
             nextState.orThrow()
         )
@@ -77,7 +78,7 @@ class AccountStateTest {
         assertEquals(
             ChainableApplication(
                 AccountOpen(openingBalance),
-                listOf(WelcomeMessageSent(emailTxn))
+                WelcomeMessageSent(emailTxn)
             ),
             nextState
         )

@@ -30,10 +30,10 @@ sealed class AccountState : State {
 
     override fun applyTransition(
         transition: Transition,
-        applied: List<Transition>
+        applied: ChainableApplication?
     ): Result<ErrorCode, ChainableApplication> {
         return stateTransitionTable[Pair(this::class, transition::class)]?.let {
-            success(ChainableApplication(it(this, transition), applied + transition))
+            success(ChainableApplication(it(this, transition), transition, applied))
         } ?: failure(StateTransitionError(this, transition))
     }
 
@@ -42,7 +42,7 @@ sealed class AccountState : State {
             stateTransitionTable[Pair(this::class, T::class)]?.let { fn ->
                 tryThis(this)
                     .map { transition ->
-                        ChainableApplication(fn(this, transition), listOf(transition))
+                        ChainableApplication(fn(this, transition), transition)
                     }
             } ?: failure(StateTransitionClassError(this, T::class))
         else
