@@ -39,15 +39,17 @@ sealed class AccountState : State {
 
     inline fun <reified S : State, reified T : Transition> applyTransition(tryThis: (S) -> Result<ErrorCode, T>): Result<ErrorCode, Application> {
         return if (this is S)
-            stateTransitionTable[Pair(this::class, T::class)]?.let { fn ->
+            isTransitionValid<T>()?.let { fn ->
                 tryThis(this)
                     .map { transition ->
                         ChainableApplication(fn(this, transition), transition)
                     }
             } ?: failure(StateTransitionClassError(this, T::class))
         else
-            failure(WrongStateError(this))
+            failure(WrongStateError(this, S::class))
     }
+
+    inline fun <reified T : Transition> isTransitionValid() = stateTransitionTable[Pair(this::class, T::class)]
 
 }
 

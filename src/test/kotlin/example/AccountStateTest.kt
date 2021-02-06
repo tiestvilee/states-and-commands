@@ -115,7 +115,7 @@ class AccountStateTest {
             }
 
         assertEquals(
-            failure(WrongStateError(InitialState)),
+            failure(WrongStateError(InitialState, NeedsWelcomeEmail::class)),
             nextState
         )
 
@@ -142,4 +142,22 @@ class AccountStateTest {
         )
     }
 
+//    @Test
+//    fun `chained to a doSomething`() {
+//        val nextState = InitialState
+//            .applyTransition(Created(emailAddress))
+//            .applyTransition { needsWelcomeEmail: NeedsWelcomeEmail ->
+//                // do something that might fail - like send an email
+//                success(WelcomeMessageSent(emailTxn))
+//            }.orThrow()
+//
+//        assertEquals(
+//            ChainableApplication(
+//                AccountOpen(openingBalance),
+//                WelcomeMessageSent(emailTxn),
+//                ChainableApplication(NeedsWelcomeEmail(emailAddress), Created(emailAddress))
+//            ),
+//            nextState
+//        )
+//    }
 }

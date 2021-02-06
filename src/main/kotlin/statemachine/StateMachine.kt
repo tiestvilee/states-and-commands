@@ -11,7 +11,6 @@ interface State {
         applied: ChainableApplication? = null
     ): Result<ErrorCode, ChainableApplication>
 }
-
 interface Transition
 
 open class Application(
@@ -26,7 +25,7 @@ data class ChainableApplication(
     override val chainedApplication: ChainableApplication? = null
 ) : Application(new, applied, chainedApplication)
 
-data class WrongStateError(val state: State) : ErrorCode
+data class WrongStateError(val actualState: State, val expectedState: KClass<out State>) : ErrorCode
 data class StateTransitionError(val state: State, val transition: Transition) : ErrorCode
 data class StateTransitionClassError(val state: State, val transitionClass: KClass<out Transition>) : ErrorCode
 
@@ -36,3 +35,13 @@ fun Result<ErrorCode, ChainableApplication>.applyTransition(transition: Transiti
     }
 }
 
+//
+//inline fun <reified S : State, reified T : Transition> Result<ErrorCode, ChainableApplication>.applyTransition(noinline tryThis: (S) -> Result<ErrorCode, T>): Result<ErrorCode, Application> {
+//    return this.flatMap { application ->
+//        if(application.new is S) {
+//            application.new.applyTransition(tryThis)
+//        } else {
+//            failure(WrongStateError(application.new))
+//        }
+//    }
+//}
