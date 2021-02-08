@@ -1,6 +1,7 @@
 package example.scheduledtask
 
 import statemachine.State
+import statemachine.StateId
 import statemachine.Transition
 import java.net.URI
 import java.time.Duration
@@ -9,7 +10,6 @@ import java.util.*
 import kotlin.reflect.KClass
 
 /* domain objects */
-data class TaskId(val id: UUID)
 data class ScheduledTask(val invokeAfter: Instant, val action: URI)
 
 /* Workflow */
@@ -27,33 +27,31 @@ sealed class ScheduledTaskWorkflow : State() {
         }
 
         init {
-            defineStateTransition { _: InitialStateST, created: ScheduledTaskWorkflowCreated ->
-                PendingTask(InitialStateST.taskId, created.scheduledTask)
+            defineStateTransition { initialState: InitialState, created: ScheduledTaskWorkflowCreated ->
+                PendingTask(initialState.id, created.scheduledTask)
             }
             defineStateTransition { pending: PendingTask, _: TaskStarted ->
-                ExecutingTask(pending.taskId, pending.scheduledTask)
+                ExecutingTask(pending.id, pending.scheduledTask)
             }
             defineStateTransition { executing: ExecutingTask, failed: TaskFailed ->
-                PendingTask(executing.taskId, executing.originalTask.let {
+                PendingTask(executing.id, executing.originalTask.let {
                     it.copy(invokeAfter = it.invokeAfter.plusMillis(failed.tryAgainDelay.toMillis()))
                 })
             }
             defineStateTransition { executing: ExecutingTask, extended: TaskExtended ->
-                PendingTask(executing.taskId, extended.scheduledTask)
+                PendingTask(executing.id, extended.scheduledTask)
             }
             defineStateTransition { executing: ExecutingTask, _: TaskAborted ->
-                AbortedTask(executing.taskId)
+                AbortedTask(executing.id)
             }
             defineStateTransition { pending: PendingTask, _: TaskAborted ->
-                AbortedTask(pending.taskId)
+                AbortedTask(pending.id)
             }
             defineStateTransition { executing: ExecutingTask, _: TaskCompleted ->
-                CompleteTask(executing.taskId)
+                CompleteTask(executing.id)
             }
         }
     }
-
-    abstract val taskId: TaskId
 
     override fun getTransitionFunction(transitionClass: KClass<out Transition>) =
         stateTransitionTable[Pair(this::class, transitionClass)]
@@ -61,24 +59,22 @@ sealed class ScheduledTaskWorkflow : State() {
 
 /* States */
 
-object InitialStateST : ScheduledTaskWorkflow() {
-    override val taskId: TaskId = TaskId(UUID.randomUUID())
-}
+data class InitialState(override val id: StateId = StateId(UUID.randomUUID())) : ScheduledTaskWorkflow()
 
-data class PendingTask(override val taskId: TaskId, val scheduledTask: ScheduledTask) : ScheduledTaskWorkflow()
+data class PendingTask(override val id: StateId, val scheduledTask: ScheduledTask) : ScheduledTaskWorkflow()
 data class ExecutingTask(
-    override val taskId: TaskId,
+    override val id: StateId,
     val originalTask: ScheduledTask
 ) : ScheduledTaskWorkflow()
 
-data class CompleteTask(override val taskId: TaskId) : ScheduledTaskWorkflow()
-data class AbortedTask(override val taskId: TaskId) : ScheduledTaskWorkflow()
+data class CompleteTask(override val id: StateId) : ScheduledTaskWorkflow()
+data class AbortedTask(override val id: StateId) : ScheduledTaskWorkflow()
 
 /* Transitions */
 
 sealed class ScheduledTaskWorkflowEvent : Transition
 
-// I removed the taskId from these events because they weren't used... except in the persistence.
+// I removed the id from these events because they weren't used... except in the persistence.
 data class ScheduledTaskWorkflowCreated(val scheduledTask: ScheduledTask) :
     ScheduledTaskWorkflowEvent()
 

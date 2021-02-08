@@ -2,8 +2,10 @@ package example
 
 import functional.ErrorCode
 import statemachine.State
+import statemachine.StateId
 import statemachine.Transition
 import java.math.BigDecimal
+import java.util.*
 import kotlin.reflect.KClass
 
 sealed class AccountState : State() {
@@ -18,18 +20,23 @@ sealed class AccountState : State() {
         }
 
         init {
-            defineStateTransition { _: InitialState, created: Created -> NeedsWelcomeEmail(created.userEmail) }
+            defineStateTransition { intialState: InitialState, created: Created ->
+                NeedsWelcomeEmail(
+                    intialState.id,
+                    created.userEmail
+                )
+            }
             defineStateTransition { needsWelcomeEmail: NeedsWelcomeEmail, messageSent: WelcomeMessageSent ->
-                AccountOpen(Money(BigDecimal.ZERO.apply { setScale(2) }))
+                AccountOpen(needsWelcomeEmail.id, Money(BigDecimal.ZERO.apply { setScale(2) }))
             }
             defineStateTransition { accountOpen: AccountOpen, updateBalance: UpdateBalance ->
-                AccountOpen(updateBalance.balance)
+                AccountOpen(accountOpen.id, updateBalance.balance)
             }
             defineStateTransition { accountOpen: AccountOpen, overdraw: Overdraw ->
-                Overdrawn(overdraw.balance)
+                Overdrawn(accountOpen.id, overdraw.balance)
             }
             defineStateTransition { overdrawn: Overdrawn, updateBalance: UpdateBalance ->
-                Overdrawn(updateBalance.balance)
+                Overdrawn(overdrawn.id, updateBalance.balance)
             }
         }
     }
@@ -38,12 +45,12 @@ sealed class AccountState : State() {
         stateTransitionTable[Pair(this::class, transitionClass)]
 }
 
-object InitialState : AccountState()
-data class ErrorState(val current: State, val transition: Transition) : AccountState()
+data class InitialState(override val id: StateId = StateId(UUID.randomUUID())) : AccountState()
+//data class ErrorState(val current: State, val transition: Transition) : AccountState()
 
-data class NeedsWelcomeEmail(val userEmail: Email) : AccountState()
-data class AccountOpen(val balance: Money) : AccountState()
-data class Overdrawn(val balance: Money) : AccountState()
+data class NeedsWelcomeEmail(override val id: StateId, val userEmail: Email) : AccountState()
+data class AccountOpen(override val id: StateId, val balance: Money) : AccountState()
+data class Overdrawn(override val id: StateId, val balance: Money) : AccountState()
 
 
 data class Created(val userEmail: Email) : Transition

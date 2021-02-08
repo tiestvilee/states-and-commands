@@ -14,15 +14,17 @@ class AccountStateTest {
     private val emailAddress = Email("blah@you.com")
     private val openingBalance = Money(BigDecimal.ZERO.apply { setScale(2) })
 
+    private val initialState = InitialState()
+
     @Test
     fun `individual transistions`() {
-        val nextState = InitialState
+        val nextState = initialState
             .applyTransition(Created(emailAddress))
             .orThrow()
 
         assertEquals(
             ChainableApplication(
-                NeedsWelcomeEmail(emailAddress),
+                NeedsWelcomeEmail(initialState.id, emailAddress),
                 Created(emailAddress)
             ),
             nextState
@@ -32,7 +34,7 @@ class AccountStateTest {
 
         assertEquals(
             ChainableApplication(
-                AccountOpen(openingBalance),
+                AccountOpen(initialState.id, openingBalance),
                 WelcomeMessageSent(emailTxn)
             ),
             finalState
@@ -41,11 +43,11 @@ class AccountStateTest {
 
     @Test
     fun `invalid transition`() {
-        val nextState = InitialState
+        val nextState = initialState
             .applyTransition(WelcomeMessageSent(emailTxn))
 
         assertEquals(
-            failure(StateTransitionError(InitialState, WelcomeMessageSent(emailTxn))),
+            failure(StateTransitionError(initialState, WelcomeMessageSent(emailTxn))),
             nextState
         )
     }
@@ -53,7 +55,7 @@ class AccountStateTest {
     @Test
     fun `dosomething in the transition`() {
 
-        val nextState = NeedsWelcomeEmail(emailAddress)
+        val nextState = NeedsWelcomeEmail(initialState.id, emailAddress)
             .applyTransition { needsWelcomeEmail: NeedsWelcomeEmail ->
                 // do something that might fail - like send an email
                 success(WelcomeMessageSent(emailTxn))
@@ -61,7 +63,7 @@ class AccountStateTest {
 
         assertEquals(
             ChainableApplication(
-                AccountOpen(openingBalance),
+                AccountOpen(initialState.id, openingBalance),
                 WelcomeMessageSent(emailTxn)
             ),
             nextState
@@ -72,7 +74,7 @@ class AccountStateTest {
     fun `don't dosomething because transition is invalid`() {
 
         var performedAction = false
-        val nextState = InitialState
+        val nextState = initialState
             .applyTransition { initial: InitialState ->
                 // do something that might fail - like send an email
                 performedAction = true
@@ -80,7 +82,7 @@ class AccountStateTest {
             }
 
         assertEquals(
-            failure(StateTransitionClassError(InitialState, WelcomeMessageSent::class)),
+            failure(StateTransitionClassError(initialState, WelcomeMessageSent::class)),
             nextState
         )
 
@@ -91,7 +93,7 @@ class AccountStateTest {
     fun `state doesn't match expected state`() {
 
         var performedAction = false
-        val nextState = InitialState
+        val nextState = initialState
             .applyTransition { needsWelcomeEmail: NeedsWelcomeEmail ->
                 // do something that might fail - like send an email
                 performedAction = true
@@ -99,7 +101,7 @@ class AccountStateTest {
             }
 
         assertEquals(
-            failure(WrongStateError(InitialState, NeedsWelcomeEmail::class)),
+            failure(WrongStateError(initialState, NeedsWelcomeEmail::class)),
             nextState
         )
 
@@ -110,7 +112,7 @@ class AccountStateTest {
     fun `fail to dosomething in the transition`() {
         @Suppress("CanBeVal") var trickCompilerIntoReturningGoodType = true
 
-        val nextState = NeedsWelcomeEmail(emailAddress)
+        val nextState = NeedsWelcomeEmail(initialState.id, emailAddress)
             .applyTransition { needsWelcomeEmail: NeedsWelcomeEmail ->
                 // do something that might fail - like send an email
                 if (trickCompilerIntoReturningGoodType)
@@ -128,15 +130,15 @@ class AccountStateTest {
 
     @Test
     fun `chained transitions`() {
-        val nextState = InitialState
+        val nextState = initialState
             .applyTransition(Created(emailAddress))
             .applyTransition(WelcomeMessageSent(emailTxn))
 
         assertEquals(
             ChainableApplication(
-                AccountOpen(openingBalance),
+                AccountOpen(initialState.id, openingBalance),
                 WelcomeMessageSent(emailTxn),
-                ChainableApplication(NeedsWelcomeEmail(emailAddress), Created(emailAddress))
+                ChainableApplication(NeedsWelcomeEmail(initialState.id, emailAddress), Created(emailAddress))
             ),
             nextState.orThrow()
         )
@@ -144,7 +146,7 @@ class AccountStateTest {
 
     @Test
     fun `chained to a doSomething`() {
-        val nextState = InitialState
+        val nextState = initialState
             .applyTransition(Created(emailAddress))
             .applyTransition { needsWelcomeEmail: NeedsWelcomeEmail ->
                 // do something that might fail - like send an email
@@ -153,9 +155,9 @@ class AccountStateTest {
 
         assertEquals(
             ChainableApplication(
-                AccountOpen(openingBalance),
+                AccountOpen(initialState.id, openingBalance),
                 WelcomeMessageSent(emailTxn),
-                ChainableApplication(NeedsWelcomeEmail(emailAddress), Created(emailAddress))
+                ChainableApplication(NeedsWelcomeEmail(initialState.id, emailAddress), Created(emailAddress))
             ),
             nextState
         )
@@ -166,10 +168,10 @@ class AccountStateTest {
         val state = listOf(
             Created(emailAddress),
             WelcomeMessageSent(emailTxn)
-        ).fold(InitialState as State, { state, transition ->
+        ).fold(initialState as State, { state, transition ->
             state.applyTransition(transition).orThrow().new
         })
 
-        assertEquals(AccountOpen(openingBalance), state)
+        assertEquals(AccountOpen(initialState.id, openingBalance), state)
     }
 }

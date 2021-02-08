@@ -5,10 +5,15 @@ import functional.Result
 import functional.Result.Companion.failure
 import functional.flatMap
 import functional.map
+import java.util.*
 import kotlin.reflect.KClass
+
+data class StateId(val id: UUID)
+
 
 abstract class State {
 
+    abstract val id: StateId
     abstract fun getTransitionFunction(transitionClass: KClass<out Transition>): ((State, Transition) -> State)?
 
     fun applyTransition(
