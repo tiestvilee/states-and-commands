@@ -56,7 +56,9 @@ open class Application(
     open val new: State,
     open val applied: Transition,
     open val chainedApplication: ChainableApplication? = null
-)
+) {
+    fun flattenTransitions(): List<Transition> = (chainedApplication?.flattenTransitions() ?: emptyList()) + applied
+}
 
 data class ChainableApplication(
     override val new: State,

@@ -160,4 +160,16 @@ class AccountStateTest {
             nextState
         )
     }
+
+    @Test
+    fun `fold to get state`() {
+        val state = listOf(
+            Created(emailAddress),
+            WelcomeMessageSent(emailTxn)
+        ).fold(InitialState as State, { state, transition ->
+            state.applyTransition(transition).orThrow().new
+        })
+
+        assertEquals(AccountOpen(openingBalance), state)
+    }
 }
