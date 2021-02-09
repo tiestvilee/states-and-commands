@@ -1,10 +1,7 @@
 package statemachine
 
-import functional.ErrorCode
-import functional.Result
+import functional.*
 import functional.Result.Companion.failure
-import functional.flatMap
-import functional.map
 import java.util.*
 import kotlin.reflect.KClass
 
@@ -54,6 +51,12 @@ abstract class State {
             failure(WrongStateError(this, S::class))
     }
 }
+
+fun List<Transition>.foldOverTransitionsIntoState(initialState: State) =
+    this.fold(initialState,
+        { state, transition ->
+            state.applyTransition(transition).orThrow().new
+        })
 
 interface Transition
 

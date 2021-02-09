@@ -4,6 +4,7 @@ import commandhandler.Command
 import commandhandler.CommandHandler
 import functional.*
 import statemachine.Application
+import statemachine.State
 import statemachine.StateId
 import java.time.Clock
 import java.time.Duration
@@ -40,8 +41,8 @@ data class RecordTaskSuccessAndComplete(
     val taskId: StateId
 ) : ScheduledTaskWorkflowCommand()
 
-class ScheduledTaskCommanderHandler(
-    private val fetch: (StateId) -> Result<ErrorCode, ScheduledTaskWorkflow>,
+class ScheduledTaskCommandHandler(
+    private val fetch: (StateId) -> Result<ErrorCode, State>,
     private val clock: Clock
 ) : CommandHandler<ScheduledTaskWorkflowCommand> {
     override fun invoke(command: ScheduledTaskWorkflowCommand): Result<ErrorCode, Application> =

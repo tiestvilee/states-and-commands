@@ -2,7 +2,7 @@ package commandhandler
 
 import functional.ErrorCode
 import functional.Result
-import functional.map
+import functional.onEach
 import statemachine.Application
 import statemachine.StateId
 import statemachine.Transition
@@ -14,13 +14,11 @@ class PersistentCommandHandler<C : Command>(
 
     override fun invoke(command: C): Result<ErrorCode, Application> {
         return delegate.invoke(command)
-            .map { application ->
+            .onEach { application ->
                 application.flattenTransitions()
                     .map {
                         saveTransition(application.new.id, it)
                     }
-
-                application
             }
     }
 }
