@@ -13,7 +13,7 @@ class ScheduledTaskWorkflowTest {
     fun `successfully executes a task and its extensions`() {
         val firstTask = ScheduledTask(Instant.now().plusSeconds(5), URI.create("http://do.this/1"))
         val secondTask = ScheduledTask(Instant.now().plusSeconds(10), URI.create("http://do.this/2"))
-        val initialState = InitialState()
+        val initialState = NotFound()
         val endState = initialState
             .applyTransition(ScheduledTaskWorkflowCreated(firstTask))
             .applyTransition(TaskStarted)

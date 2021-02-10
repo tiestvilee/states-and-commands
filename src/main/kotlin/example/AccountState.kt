@@ -20,7 +20,7 @@ sealed class AccountState : State() {
         }
 
         init {
-            defineStateTransition { intialState: InitialState, created: Created ->
+            defineStateTransition { intialState: NotFound, created: Created ->
                 NeedsWelcomeEmail(
                     intialState.id,
                     created.userEmail
@@ -45,7 +45,7 @@ sealed class AccountState : State() {
         stateTransitionTable[Pair(this::class, transitionClass)]
 }
 
-data class InitialState(override val id: StateId = StateId(UUID.randomUUID())) : AccountState()
+data class NotFound(override val id: StateId = StateId(UUID.randomUUID())) : AccountState()
 //data class ErrorState(val current: State, val transition: Transition) : AccountState()
 
 data class NeedsWelcomeEmail(override val id: StateId, val userEmail: Email) : AccountState()

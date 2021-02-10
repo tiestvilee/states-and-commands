@@ -56,7 +56,7 @@ class ScheduledTaskCommandHandler(
         }
 
     private fun CreatePendingTask.perform(): Result<ErrorCode, Application> =
-        InitialState().applyTransition(ScheduledTaskWorkflowCreated(this.scheduledTask))
+        NotFound().applyTransition(ScheduledTaskWorkflowCreated(this.scheduledTask))
 
     private fun StartTask.perform(): Result<ErrorCode, Application> = fetch(this.taskId)
         .flatMap { task ->

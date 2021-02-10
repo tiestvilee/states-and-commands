@@ -41,4 +41,4 @@ class ScheduledTaskWorkflowCommandHandlerTest {
 
 private fun InMemoryPersistence.foldOverTransitions(id: StateId) =
     this.fetchTransitionsFor(id)
-        .map { it.foldOverTransitionsIntoState(InitialState(id)) }
+        .map { it.foldOverTransitionsIntoState(NotFound(id)) }

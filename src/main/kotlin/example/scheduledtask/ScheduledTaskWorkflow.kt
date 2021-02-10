@@ -27,7 +27,7 @@ sealed class ScheduledTaskWorkflow : State() {
         }
 
         init {
-            defineStateTransition { initialState: InitialState, created: ScheduledTaskWorkflowCreated ->
+            defineStateTransition { initialState: NotFound, created: ScheduledTaskWorkflowCreated ->
                 PendingTask(initialState.id, created.scheduledTask)
             }
             defineStateTransition { pending: PendingTask, _: TaskStarted ->
@@ -59,7 +59,7 @@ sealed class ScheduledTaskWorkflow : State() {
 
 /* States */
 
-data class InitialState(override val id: StateId = StateId(UUID.randomUUID())) : ScheduledTaskWorkflow()
+data class NotFound(override val id: StateId = StateId(UUID.randomUUID())) : ScheduledTaskWorkflow()
 
 data class PendingTask(override val id: StateId, val scheduledTask: ScheduledTask) : ScheduledTaskWorkflow()
 data class ExecutingTask(

@@ -14,7 +14,7 @@ class AccountStateTest {
     private val emailAddress = Email("blah@you.com")
     private val openingBalance = Money(BigDecimal.ZERO.apply { setScale(2) })
 
-    private val initialState = InitialState()
+    private val initialState = NotFound()
 
     @Test
     fun `individual transistions`() {
@@ -75,7 +75,7 @@ class AccountStateTest {
 
         var performedAction = false
         val nextState = initialState
-            .applyTransition { initial: InitialState ->
+            .applyTransition { initial: NotFound ->
                 // do something that might fail - like send an email
                 performedAction = true
                 success(WelcomeMessageSent(emailTxn))
