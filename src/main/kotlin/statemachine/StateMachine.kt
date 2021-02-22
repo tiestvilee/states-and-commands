@@ -7,90 +7,95 @@ import kotlin.reflect.KClass
 
 data class StateId(val id: UUID)
 
+interface State
+interface Transition
 
-abstract class State {
+class StateMachine<S : State, T : Transition>(
+    val stateTransitionTable: Map<Pair<KClass<out S>, KClass<out T>>, (S, T) -> S> = emptyMap()
+) {
 
-    abstract val id: StateId
-    abstract fun getTransitionFunction(transitionClass: KClass<out Transition>): ((State, Transition) -> State)?
+    fun getTransitionFunction(state: S, transitionClass: KClass<out T>): ((S, T) -> S)? {
+        return stateTransitionTable[Pair(state::class, transitionClass)]
+    }
 
     fun applyTransition(
-        transition: Transition,
-        applied: ChainableApplication? = null
-    ): Result<ErrorCode, ChainableApplication> {
-        return getTransitionFunction(transition::class)?.let {
-            Result.success(ChainableApplication(it(this, transition), transition, applied))
-        } ?: failure(StateTransitionError(this, transition))
+        state: S,
+        transition: T,
+        applied: ChainableApplication<S, T>? = null
+    ): Result<ErrorCode, ChainableApplication<S, T>> {
+        return getTransitionFunction(state, transition::class)?.let {
+            Result.success(ChainableApplication(it(state, transition), transition, applied))
+        } ?: failure(StateTransitionError(state, transition))
     }
 
-    inline fun <reified S : State, reified T : Transition> applyTransition(
-        tryThis: (S) -> Result<ErrorCode, T>
-    ): Result<ErrorCode, Application> {
-        return if (this is S)
-            getTransitionFunction(T::class)?.let { fn ->
-                tryThis(this)
-                    .map { transition ->
-                        ChainableApplication(fn(this, transition), transition)
-                    }
-            } ?: failure(StateTransitionClassError(this, T::class))
-        else
-            failure(WrongStateError(this, S::class))
+    inline fun <S2 : S, reified T2 : T> applyTransition(
+        state: S2,
+        tryThis: (S2) -> Result<ErrorCode, T2>,
+        applied: ChainableApplication<S, T>? = null
+    ): Result<ErrorCode, Application<S, T>> {
+        return getTransitionFunction(state, T2::class)?.let { fn ->
+            tryThis(state)
+                .map { transition ->
+                    ChainableApplication(fn(state, transition), transition, applied)
+                }
+        } ?: failure(StateTransitionClassError(state, T2::class))
     }
 
-    inline fun <reified S : State, reified T : Transition> applyTransition(
-        applied: ChainableApplication? = null,
-        tryThis: (S) -> Result<ErrorCode, T>
-    ): Result<ErrorCode, Application> {
-        return if (this is S)
-            getTransitionFunction(T::class)?.let { fn ->
-                tryThis(this)
-                    .map { transition ->
-                        ChainableApplication(fn(this, transition), transition, applied)
-                    }
-            } ?: failure(StateTransitionClassError(this, T::class))
-        else
-            failure(WrongStateError(this, S::class))
+    fun <S2 : S, T2 : T> foldOverTransitionsIntoState(initialState: S2, transitions: List<T2>) =
+        transitions.fold(initialState as S,
+            { state, transition ->
+                applyTransition(state, transition).orThrow().new
+            })
+
+    @Suppress("UNCHECKED_CAST")
+    inline fun <reified S2 : S, reified T2 : T> defineStateTransition(noinline function: (S2, T2) -> S): StateMachine<S, T> {
+        val stateClass: KClass<S> = S2::class as KClass<S>
+        val transitionClass: KClass<T> = T2::class as KClass<T>
+        val newStateTransition: Pair<Pair<KClass<S>, KClass<T>>, (S, T) -> S> =
+            Pair(Pair(stateClass, transitionClass), function as (S, T) -> S)
+        return StateMachine(stateTransitionTable + newStateTransition)
     }
 }
 
-fun List<Transition>.foldOverTransitionsIntoState(initialState: State) =
-    this.fold(initialState,
-        { state, transition ->
-            state.applyTransition(transition).orThrow().new
-        })
 
-interface Transition
-
-open class Application(
-    open val new: State,
-    open val applied: Transition,
-    open val chainedApplication: ChainableApplication? = null
+open class Application<S : State, T : Transition>(
+    open val new: S,
+    open val applied: T,
+    open val chainedApplication: ChainableApplication<S, T>? = null
 ) {
     fun flattenTransitions(): List<Transition> = (chainedApplication?.flattenTransitions() ?: emptyList()) + applied
 }
 
-data class ChainableApplication(
-    override val new: State,
-    override val applied: Transition,
-    override val chainedApplication: ChainableApplication? = null
-) : Application(new, applied, chainedApplication)
+data class ChainableApplication<S : State, T : Transition>(
+    override val new: S,
+    override val applied: T,
+    override val chainedApplication: ChainableApplication<S, T>? = null
+) : Application<S, T>(new, applied, chainedApplication)
+
+fun <S : State, T : Transition> ChainableApplication<S, T>.applyTransition(
+    stateMachine: StateMachine<S, T>,
+    transition: T
+): Result<ErrorCode, ChainableApplication<S, T>> =
+    stateMachine.applyTransition(this.new, transition, this)
+
+fun <S : State, T : Transition> Result<ErrorCode, ChainableApplication<S, T>>.applyTransition(
+    stateMachine: StateMachine<S, T>,
+    transition: T
+): Result<ErrorCode, ChainableApplication<S, T>> =
+    this.flatMap { stateMachine.applyTransition(it.new, transition, it) }
+
+inline fun <S : State, T : Transition, reified S2 : S, reified T2 : T> Result<ErrorCode, ChainableApplication<S, T>>.applyTransition2(
+    stateMachine: StateMachine<S, T>,
+    tryThis: (S2) -> Result<ErrorCode, T2>
+): Result<ErrorCode, Application<S, T>> =
+    this.flatMap {
+        if (it.new is S2) {
+            stateMachine.applyTransition(it.new, tryThis, it)
+        } else {
+            failure(WrongStateError(it.new, S2::class))
+        }
+    }
 
 data class WrongStateError(val actualState: State, val expectedState: KClass<out State>) : ErrorCode
 data class StateTransitionError(val state: State, val transition: Transition) : ErrorCode
 data class StateTransitionClassError(val state: State, val transitionClass: KClass<out Transition>) : ErrorCode
-
-fun Result<ErrorCode, ChainableApplication>.applyTransition(transition: Transition): Result<ErrorCode, ChainableApplication> {
-    return this.flatMap { chainableApplication ->
-        chainableApplication.new.applyTransition(transition, chainableApplication)
-    }
-}
-
-
-inline fun <reified S : State, reified T : Transition> Result<ErrorCode, ChainableApplication>.applyTransition(noinline tryThis: (S) -> Result<ErrorCode, T>): Result<ErrorCode, Application> {
-    return this.flatMap { application ->
-        if (application.new is S) {
-            application.new.applyTransition(application, tryThis)
-        } else {
-            failure(WrongStateError(application.new, S::class))
-        }
-    }
-}
