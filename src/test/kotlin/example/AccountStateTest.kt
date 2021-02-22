@@ -53,7 +53,7 @@ class AccountStateTest {
     @Test
     fun `dosomething in the transition`() {
 
-        val nextState = accountWorkflow.applyTransition(NeedsWelcomeEmail(initialState.id, emailAddress),
+        val nextState = accountWorkflow.applyTransition2(NeedsWelcomeEmail(initialState.id, emailAddress),
             { needsWelcomeEmail: NeedsWelcomeEmail ->
                 // do something that might fail - like send an email
                 success(WelcomeMessageSent(emailTxn))
@@ -72,7 +72,7 @@ class AccountStateTest {
     fun `don't dosomething because transition is invalid`() {
 
         var performedAction = false
-        val nextState = accountWorkflow.applyTransition(initialState, { initial: NotFound ->
+        val nextState = accountWorkflow.applyTransition2(initialState, { initial: NotFound ->
             // do something that might fail - like send an email
             performedAction = true
             success(WelcomeMessageSent(emailTxn))
@@ -100,7 +100,7 @@ class AccountStateTest {
     fun `fail to dosomething in the transition`() {
         @Suppress("CanBeVal") var trickCompilerIntoReturningGoodType = true
 
-        val nextState = accountWorkflow.applyTransition(NeedsWelcomeEmail(initialState.id, emailAddress),
+        val nextState = accountWorkflow.applyTransition2(NeedsWelcomeEmail(initialState.id, emailAddress),
             { needsWelcomeEmail: NeedsWelcomeEmail ->
                 // do something that might fail - like send an email
                 if (trickCompilerIntoReturningGoodType)

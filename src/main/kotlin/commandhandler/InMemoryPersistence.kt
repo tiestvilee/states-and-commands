@@ -6,14 +6,14 @@ import functional.asSuccess
 import statemachine.StateId
 import statemachine.Transition
 
-class InMemoryPersistence {
-    val data: MutableList<Pair<StateId, Transition>> = mutableListOf()
+class InMemoryPersistence<T : Transition> {
+    val data: MutableList<Pair<StateId, T>> = mutableListOf()
 
-    fun save(id: StateId, transition: Transition) {
+    fun save(id: StateId, transition: T) {
         data += Pair(id, transition)
     }
 
-    fun fetchTransitionsFor(id: StateId): Result<ErrorCode, List<Transition>> {
+    fun fetchTransitionsFor(id: StateId): Result<ErrorCode, List<T>> {
         return data.filter { it.first == id }.map { it.second }.asSuccess()
     }
 }

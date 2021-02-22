@@ -1,6 +1,6 @@
 package example.scheduledtask
 
-import statemachine.State
+import commandhandler.StateWithId
 import statemachine.StateId
 import statemachine.StateMachine
 import statemachine.Transition
@@ -40,9 +40,7 @@ val scheduledTaskWorkflow = StateMachine<ScheduledTaskWorkflowState, ScheduledTa
     }
 
 /* States */
-sealed class ScheduledTaskWorkflowState : State {
-    abstract val id: StateId
-}
+sealed class ScheduledTaskWorkflowState : StateWithId()
 
 data class NotFound(override val id: StateId = StateId(UUID.randomUUID())) : ScheduledTaskWorkflowState()
 

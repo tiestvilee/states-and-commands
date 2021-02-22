@@ -28,7 +28,7 @@ class StateMachine<S : State, T : Transition>(
         } ?: failure(StateTransitionError(state, transition))
     }
 
-    inline fun <S2 : S, reified T2 : T> applyTransition(
+    inline fun <S2 : S, reified T2 : T> applyTransition2(
         state: S2,
         tryThis: (S2) -> Result<ErrorCode, T2>,
         applied: ChainableApplication<S, T>? = null
@@ -63,7 +63,7 @@ open class Application<S : State, T : Transition>(
     open val applied: T,
     open val chainedApplication: ChainableApplication<S, T>? = null
 ) {
-    fun flattenTransitions(): List<Transition> = (chainedApplication?.flattenTransitions() ?: emptyList()) + applied
+    fun flattenTransitions(): List<T> = (chainedApplication?.flattenTransitions() ?: emptyList()) + applied
 }
 
 data class ChainableApplication<S : State, T : Transition>(
@@ -90,7 +90,7 @@ inline fun <S : State, T : Transition, reified S2 : S, reified T2 : T> Result<Er
 ): Result<ErrorCode, Application<S, T>> =
     this.flatMap {
         if (it.new is S2) {
-            stateMachine.applyTransition(it.new, tryThis, it)
+            stateMachine.applyTransition2(it.new, tryThis, it)
         } else {
             failure(WrongStateError(it.new, S2::class))
         }
