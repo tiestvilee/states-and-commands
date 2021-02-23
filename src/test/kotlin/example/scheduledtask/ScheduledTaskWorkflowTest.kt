@@ -5,6 +5,7 @@ import functional.orThrow
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import statemachine.applyTransition
+import statemachine.dot
 import java.net.URI
 import java.time.Instant
 
@@ -40,5 +41,10 @@ class ScheduledTaskWorkflowTest {
                 TaskCompleted,
             ), endState.flattenTransitions()
         )
+    }
+
+    @Test
+    fun `outputs dot graph`() {
+        println(scheduledTaskWorkflow.dot())
     }
 }

@@ -48,7 +48,7 @@ class StateMachine<S : State, T : Transition>(
             })
 
     @Suppress("UNCHECKED_CAST")
-    inline fun <reified S2 : S, reified T2 : T> defineStateTransition(noinline function: (S2, T2) -> S): StateMachine<S, T> {
+    inline fun <reified S2 : S, reified T2 : T, S3 : S> defineStateTransition(noinline function: (S2, T2) -> S3): StateMachine<S, T> {
         val stateClass: KClass<S> = S2::class as KClass<S>
         val transitionClass: KClass<T> = T2::class as KClass<T>
         val newStateTransition: Pair<Pair<KClass<S>, KClass<T>>, (S, T) -> S> =
@@ -57,6 +57,17 @@ class StateMachine<S : State, T : Transition>(
     }
 }
 
+fun <S : State, T : Transition> StateMachine<S, T>.dot(): String {
+    return """digraph {
+    |${
+        stateTransitionTable.entries.flatMap {
+            it.value::class.java.declaredMethods.toList()
+        }
+            .filterNot { it.parameterTypes[0].isInstance(State::class.java) }
+            .joinToString("\n") { """  ${it.parameterTypes[0].simpleName} -> ${it.returnType.simpleName} [label="${it.parameterTypes[1].simpleName}"]""" }
+    }
+    |}""".trimMargin()
+}
 
 open class Application<S : State, T : Transition>(
     open val new: S,
