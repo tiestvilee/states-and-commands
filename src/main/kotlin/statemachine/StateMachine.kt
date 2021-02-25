@@ -2,6 +2,7 @@ package statemachine
 
 import functional.*
 import functional.Result.Companion.failure
+import functional.Result.Companion.success
 import java.util.*
 import kotlin.reflect.KClass
 
@@ -18,33 +19,15 @@ class StateMachine<S : State, T : Transition>(
         return stateTransitionTable[Pair(state::class, transitionClass)]
     }
 
-    fun applyTransition(
-        state: S,
-        transition: T,
-        applied: ChainableApplication<S, T>? = null
-    ): Result<ErrorCode, ChainableApplication<S, T>> {
-        return getTransitionFunction(state, transition::class)?.let {
-            Result.success(ChainableApplication(it(state, transition), transition, applied))
+    fun nextState(state: S, transition: T): Result<ErrorCode, S> =
+        getTransitionFunction(state, transition::class)?.let {
+            success(it(state, transition))
         } ?: failure(StateTransitionError(state, transition))
-    }
-
-    inline fun <S2 : S, reified T2 : T> applyTransition2(
-        state: S2,
-        tryThis: (S2) -> Result<ErrorCode, T2>,
-        applied: ChainableApplication<S, T>? = null
-    ): Result<ErrorCode, Application<S, T>> {
-        return getTransitionFunction(state, T2::class)?.let { fn ->
-            tryThis(state)
-                .map { transition ->
-                    ChainableApplication(fn(state, transition), transition, applied)
-                }
-        } ?: failure(StateTransitionClassError(state, T2::class))
-    }
 
     fun <S2 : S, T2 : T> foldOverTransitionsIntoState(initialState: S2, transitions: List<T2>) =
         transitions.fold(initialState as S,
             { state, transition ->
-                applyTransition(state, transition).orThrow().new
+                nextState(state, transition).orThrow()
             })
 
     @Suppress("UNCHECKED_CAST")
@@ -55,6 +38,31 @@ class StateMachine<S : State, T : Transition>(
             Pair(Pair(stateClass, transitionClass), function as (S, T) -> S)
         return StateMachine(stateTransitionTable + newStateTransition)
     }
+}
+
+
+fun <S : State, T : Transition> StateMachine<S, T>.applyTransition(
+    state: S,
+    transition: T,
+    applied: ChainableApplication<S, T>? = null
+): Result<ErrorCode, ChainableApplication<S, T>> {
+    return nextState(state, transition)
+        .map {
+            ChainableApplication(it, transition, applied)
+        }
+}
+
+inline fun <S : State, T : Transition, S2 : S, reified T2 : T> StateMachine<S, T>.applyTransition2(
+    state: S2,
+    tryThis: (S2) -> Result<ErrorCode, T2>,
+    applied: ChainableApplication<S, T>? = null
+): Result<ErrorCode, Application<S, T>> {
+    return getTransitionFunction(state, T2::class)?.let { fn ->
+        tryThis(state)
+            .map { transition ->
+                ChainableApplication(fn(state, transition), transition, applied)
+            }
+    } ?: failure(StateTransitionClassError(state, T2::class))
 }
 
 fun <S : State, T : Transition> StateMachine<S, T>.dot(): String {
