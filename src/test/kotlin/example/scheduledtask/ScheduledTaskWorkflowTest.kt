@@ -1,6 +1,5 @@
 package example.scheduledtask
 
-import functional.flatMap
 import functional.orThrow
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -17,21 +16,13 @@ class ScheduledTaskWorkflowTest {
         val secondTask = ScheduledTask(Instant.now().plusSeconds(10), URI.create("http://do.this/2"))
         val initialState = NotFound()
         val endState = scheduledTaskWorkflow.applyTransition(initialState, ScheduledTaskWorkflowCreated(firstTask))
-            .flatMap {
-                it.applyTransition(scheduledTaskWorkflow, TaskStarted)
-            }
-            .flatMap {
-                it.applyTransition(scheduledTaskWorkflow, TaskExtended(secondTask))
-            }
-            .flatMap {
-                it.applyTransition(scheduledTaskWorkflow, TaskStarted)
-            }
-            .flatMap {
-                it.applyTransition(scheduledTaskWorkflow, TaskCompleted)
-            }
+            .applyTransition(scheduledTaskWorkflow, TaskStarted)
+            .applyTransition(scheduledTaskWorkflow, TaskExtended(secondTask))
+            .applyTransition(scheduledTaskWorkflow, TaskStarted)
+            .applyTransition(scheduledTaskWorkflow, TaskCompleted)
             .orThrow()
 
-        assertEquals(CompleteTask(initialState.id), endState.new)
+        assertEquals(CompleteTask(initialState.id), endState.state)
         assertEquals(
             listOf(
                 ScheduledTaskWorkflowCreated(firstTask),

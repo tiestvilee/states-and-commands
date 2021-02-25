@@ -1,8 +1,10 @@
 package statemachine
 
-import functional.*
+import functional.ErrorCode
+import functional.Result
 import functional.Result.Companion.failure
 import functional.Result.Companion.success
+import functional.orThrow
 import java.util.*
 import kotlin.reflect.KClass
 
@@ -41,29 +43,9 @@ class StateMachine<S : State, T : Transition>(
 }
 
 
-fun <S : State, T : Transition> StateMachine<S, T>.applyTransition(
-    state: S,
-    transition: T,
-    applied: ChainableApplication<S, T>? = null
-): Result<ErrorCode, ChainableApplication<S, T>> {
-    return nextState(state, transition)
-        .map {
-            ChainableApplication(it, transition, applied)
-        }
-}
-
-inline fun <S : State, T : Transition, S2 : S, reified T2 : T> StateMachine<S, T>.applyTransition2(
-    state: S2,
-    tryThis: (S2) -> Result<ErrorCode, T2>,
-    applied: ChainableApplication<S, T>? = null
-): Result<ErrorCode, Application<S, T>> {
-    return getTransitionFunction(state, T2::class)?.let { fn ->
-        tryThis(state)
-            .map { transition ->
-                ChainableApplication(fn(state, transition), transition, applied)
-            }
-    } ?: failure(StateTransitionClassError(state, T2::class))
-}
+data class WrongStateError(val actualState: State, val expectedState: KClass<out State>) : ErrorCode
+data class StateTransitionError(val state: State, val transition: Transition) : ErrorCode
+data class StateTransitionClassError(val state: State, val transitionClass: KClass<out Transition>) : ErrorCode
 
 fun <S : State, T : Transition> StateMachine<S, T>.dot(): String {
     return """digraph {
@@ -76,45 +58,3 @@ fun <S : State, T : Transition> StateMachine<S, T>.dot(): String {
     }
     |}""".trimMargin()
 }
-
-open class Application<S : State, T : Transition>(
-    open val new: S,
-    open val applied: T,
-    open val chainedApplication: ChainableApplication<S, T>? = null
-) {
-    fun flattenTransitions(): List<T> = (chainedApplication?.flattenTransitions() ?: emptyList()) + applied
-}
-
-data class ChainableApplication<S : State, T : Transition>(
-    override val new: S,
-    override val applied: T,
-    override val chainedApplication: ChainableApplication<S, T>? = null
-) : Application<S, T>(new, applied, chainedApplication)
-
-fun <S : State, T : Transition> ChainableApplication<S, T>.applyTransition(
-    stateMachine: StateMachine<S, T>,
-    transition: T
-): Result<ErrorCode, ChainableApplication<S, T>> =
-    stateMachine.applyTransition(this.new, transition, this)
-
-fun <S : State, T : Transition> Result<ErrorCode, ChainableApplication<S, T>>.applyTransition(
-    stateMachine: StateMachine<S, T>,
-    transition: T
-): Result<ErrorCode, ChainableApplication<S, T>> =
-    this.flatMap { stateMachine.applyTransition(it.new, transition, it) }
-
-inline fun <S : State, T : Transition, reified S2 : S, reified T2 : T> Result<ErrorCode, ChainableApplication<S, T>>.applyTransition2(
-    stateMachine: StateMachine<S, T>,
-    tryThis: (S2) -> Result<ErrorCode, T2>
-): Result<ErrorCode, Application<S, T>> =
-    this.flatMap {
-        if (it.new is S2) {
-            stateMachine.applyTransition2(it.new, tryThis, it)
-        } else {
-            failure(WrongStateError(it.new, S2::class))
-        }
-    }
-
-data class WrongStateError(val actualState: State, val expectedState: KClass<out State>) : ErrorCode
-data class StateTransitionError(val state: State, val transition: Transition) : ErrorCode
-data class StateTransitionClassError(val state: State, val transitionClass: KClass<out Transition>) : ErrorCode

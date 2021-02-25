@@ -33,7 +33,7 @@ class ScheduledTaskWorkflowCommandHandlerTest {
         val firstTask = ScheduledTask(Instant.now().plusSeconds(-5), URI.create("http://do.this/1"))
         val secondTask = ScheduledTask(Instant.now().plusSeconds(-1), URI.create("http://do.this/2"))
 
-        val entityId = persistentHandler.invoke(CreatePendingTask(firstTask)).orThrow().new.id
+        val entityId = persistentHandler.invoke(CreatePendingTask(firstTask)).orThrow().state.id
         persistentHandler.invoke(StartTask(entityId)).orThrow()
         persistentHandler.invoke(RecordTaskSuccessAndExtend(entityId, secondTask)).orThrow()
 

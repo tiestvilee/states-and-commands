@@ -22,7 +22,7 @@ class PersistentCommandHandler<C : Command, S : StateWithId, T : Transition>(
             .onEach { application ->
                 application.flattenTransitions()
                     .map {
-                        saveTransition(application.new.id, it)
+                        saveTransition(application.state.id, it)
                     }
             }
     }
