@@ -39,16 +39,20 @@ fun <S : State, T : Transition> StateMachine<S, T>.applyTransition(
             ChainableApplication(this, it, listOf(transition))
         }
 
-inline fun <S : State, T : Transition, S2 : S, reified T2 : T> StateMachine<S, T>.applyTransitionWithSingleSideEffect(
-    state: S2,
+inline fun <S : State, T : Transition, reified S2 : S, reified T2 : T> StateMachine<S, T>.applyTransitionWithSingleSideEffect(
+    state: S,
     tryThis: (S2) -> Result<ErrorCode, T2>
 ): Result<ErrorCode, FinalApplication<S, T>> =
-    this.getTransitionFunction(state, T2::class)?.let { fn ->
-        tryThis(state)
-            .map { transition ->
-                FinalApplication(fn(state, transition), listOf(transition))
-            }
-    } ?: failure(InvalidTransitionClassForState(state, T2::class))
+    if (state is S2) {
+        this.getTransitionFunction(state, T2::class)?.let { fn ->
+            tryThis(state)
+                .map { transition ->
+                    FinalApplication(fn(state, transition), listOf(transition))
+                }
+        } ?: failure(InvalidTransitionClassForState(state, T2::class))
+    } else {
+        failure(IncompatibleStateWithFunction(state, S2::class))
+    }
 
 fun <S : State, T : Transition> Result<ErrorCode, ChainableApplication<S, T>>.applyTransition(transition: T): Result<ErrorCode, ChainableApplication<S, T>> =
     this.flatMap { chain ->
@@ -70,9 +74,9 @@ inline fun <S : State, T : Transition, reified S2 : S, reified T2 : T> Result<Er
                     }
             } ?: failure(InvalidTransitionClassForState(chain.state, T2::class))
         } else {
-            failure(UnexpectedState(chain.state, S2::class))
+            failure(IncompatibleStateWithFunction(chain.state, S2::class))
         }
     }
 
-data class UnexpectedState(val actualState: State, val expectedState: KClass<out State>) : ErrorCode
+data class IncompatibleStateWithFunction(val actualState: State, val expectedState: KClass<out State>) : ErrorCode
 data class InvalidTransitionClassForState(val state: State, val transitionClass: KClass<out Transition>) : ErrorCode

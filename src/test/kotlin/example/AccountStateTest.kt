@@ -92,6 +92,25 @@ class AccountStateTest {
     }
 
     @Test
+    fun `don't dosomething because state is invalid`() {
+
+        var performedAction = false
+        val nextState =
+            accountWorkflow.applyTransitionWithSingleSideEffect(initialState, { needsWelcomeEmail: NeedsWelcomeEmail ->
+                // do something that might fail - like send an email
+                performedAction = true
+                success(WelcomeMessageSent(emailTxn))
+            })
+
+        assertEquals(
+            failure(IncompatibleStateWithFunction(initialState, NeedsWelcomeEmail::class)),
+            nextState
+        )
+
+        assertFalse(performedAction, "shouldn't be called because state is invalid")
+    }
+
+    @Test
     fun `state of sied effect function doesn't match expected state causes compile time error`() {
         val tryThis: (NeedsWelcomeEmail) -> Result<ErrorCode, WelcomeMessageSent> =
             { needsWelcomeEmail: NeedsWelcomeEmail ->

@@ -3,7 +3,6 @@ package example.scheduledtask
 import commandhandler.Command
 import commandhandler.CommandHandler
 import functional.*
-import functional.Result.Companion.failure
 import statemachine.*
 import java.time.Clock
 import java.time.Duration
@@ -61,18 +60,14 @@ class ScheduledTaskCommandHandler(
     private fun StartTask.perform(): Result<ErrorCode, Application<ScheduledTaskWorkflowState, ScheduledTaskWorkflowEvent>> =
         fetch(this.taskId)
             .flatMap { task ->
-                when (task) {
-                    is PendingTask ->
-                        stateMachine.applyTransitionWithSingleSideEffect(task, { pending: PendingTask ->
-                            val now = clock.instant()
-                            if (pending.scheduledTask.invokeAfter.isBefore(now)) {
-                                TaskStarted.asSuccess()
-                            } else {
-                                CannotExecuteTaskBeforeInvokeAfterDate(taskId, pending.scheduledTask, now).asFailure()
-                            }
-                        })
-                    else -> failure(ProcessInWrongState(this, task))
-                }
+                stateMachine.applyTransitionWithSingleSideEffect(task, { pending: PendingTask ->
+                    val now = clock.instant()
+                    if (pending.scheduledTask.invokeAfter.isBefore(now)) {
+                        TaskStarted.asSuccess()
+                    } else {
+                        CannotExecuteTaskBeforeInvokeAfterDate(taskId, pending.scheduledTask, now).asFailure()
+                    }
+                })
             }
 
     private fun FailTask.perform(): Result<ErrorCode, Application<ScheduledTaskWorkflowState, ScheduledTaskWorkflowEvent>> =
