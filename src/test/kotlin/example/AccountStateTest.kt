@@ -1,5 +1,7 @@
 package example
 
+import functional.ErrorCode
+import functional.Result
 import functional.Result.Companion.failure
 import functional.Result.Companion.success
 import functional.orThrow
@@ -17,22 +19,24 @@ class AccountStateTest {
     private val initialState = NotFound()
 
     @Test
-    fun `individual transistions`() {
-        val nextState = accountWorkflow.applyTransition(initialState, Created(emailAddress))
+    fun `individual transitions`() {
+        val application = accountWorkflow.applyTransition(initialState, Created(emailAddress))
             .orThrow()
 
         assertEquals(
-            ChainableApplication<AccountState, AccountTransition>(
+            ChainableApplication(
+                accountWorkflow,
                 NeedsWelcomeEmail(initialState.id, emailAddress),
                 listOf(Created(emailAddress))
             ),
-            nextState
+            application
         )
 
-        val finalState = accountWorkflow.applyTransition(nextState.state, WelcomeMessageSent(emailTxn)).orThrow()
+        val finalState = accountWorkflow.applyTransition(application.state, WelcomeMessageSent(emailTxn)).orThrow()
 
         assertEquals(
-            ChainableApplication<AccountState, AccountTransition>(
+            ChainableApplication(
+                accountWorkflow,
                 AccountOpen(initialState.id, openingBalance),
                 listOf(WelcomeMessageSent(emailTxn))
             ),
@@ -45,7 +49,7 @@ class AccountStateTest {
         val nextState = accountWorkflow.applyTransition(initialState, WelcomeMessageSent(emailTxn))
 
         assertEquals(
-            failure(StateTransitionError(initialState, WelcomeMessageSent(emailTxn))),
+            failure(InvalidTransitionForState(initialState, WelcomeMessageSent(emailTxn))),
             nextState
         )
     }
@@ -53,14 +57,15 @@ class AccountStateTest {
     @Test
     fun `dosomething in the transition`() {
 
-        val nextState = accountWorkflow.applyTransitionWithSideEffect(NeedsWelcomeEmail(initialState.id, emailAddress),
-            { needsWelcomeEmail: NeedsWelcomeEmail ->
-                // do something that might fail - like send an email
-                success(WelcomeMessageSent(emailTxn))
-            }).orThrow()
+        val nextState =
+            accountWorkflow.applyTransitionWithSingleSideEffect(NeedsWelcomeEmail(initialState.id, emailAddress),
+                { _: NeedsWelcomeEmail ->
+                    // do something that might fail - like send an email
+                    success(WelcomeMessageSent(emailTxn))
+                }).orThrow()
 
         assertEquals(
-            ChainableApplication<AccountState, AccountTransition>(
+            FinalApplication(
                 AccountOpen(initialState.id, openingBalance),
                 listOf(WelcomeMessageSent(emailTxn))
             ),
@@ -72,14 +77,14 @@ class AccountStateTest {
     fun `don't dosomething because transition is invalid`() {
 
         var performedAction = false
-        val nextState = accountWorkflow.applyTransitionWithSideEffect(initialState, { initial: NotFound ->
+        val nextState = accountWorkflow.applyTransitionWithSingleSideEffect(initialState, { initial: NotFound ->
             // do something that might fail - like send an email
             performedAction = true
             success(WelcomeMessageSent(emailTxn))
         })
 
         assertEquals(
-            failure(StateTransitionClassError(initialState, WelcomeMessageSent::class)),
+            failure(InvalidTransitionClassForState(initialState, WelcomeMessageSent::class)),
             nextState
         )
 
@@ -87,27 +92,45 @@ class AccountStateTest {
     }
 
     @Test
-    fun `state doesn't match expected state`() {
-// shouldn't compile
-//        accountWorkflow.applyTransition(initialState,
-//             { needsWelcomeEmail: InitialState ->
-//                // do something that might fail - like send an email
-//                success(WelcomeMessageSent(emailTxn))
-//            })
+    fun `state of sied effect function doesn't match expected state causes compile time error`() {
+        val tryThis: (NeedsWelcomeEmail) -> Result<ErrorCode, WelcomeMessageSent> =
+            { needsWelcomeEmail: NeedsWelcomeEmail ->
+                success(WelcomeMessageSent(emailTxn))
+            }
+        // shouldn't compile
+//        accountWorkflow.applyTransitionWithSideEffect(initialState, tryThis)
+    }
+
+    @Test
+    fun `emitting more than one type of event from side-effect function causes an error`() {
+        // force upcasting of Transition
+        val tryThis: (NotFound) -> Result<ErrorCode, AccountTransition> = { initialState: NotFound ->
+            success(Created(emailAddress))
+        }
+
+        // shouldn't compile, the Result has been upcast.
+        // not possible. only works at Runtime :(
+        val failure = accountWorkflow.applyTransitionWithSingleSideEffect(initialState, tryThis)
+
+        assertEquals(
+            failure(InvalidTransitionClassForState(initialState, AccountTransition::class)),
+            failure
+        )
     }
 
     @Test
     fun `fail to dosomething in the transition`() {
         @Suppress("CanBeVal") var trickCompilerIntoReturningGoodType = true
 
-        val nextState = accountWorkflow.applyTransitionWithSideEffect(NeedsWelcomeEmail(initialState.id, emailAddress),
-            { needsWelcomeEmail: NeedsWelcomeEmail ->
-                // do something that might fail - like send an email
-                if (trickCompilerIntoReturningGoodType)
-                    failure(EmailSendFailure("invalid hostname"))
-                else
-                    success(WelcomeMessageSent(emailTxn))
-            })
+        val nextState =
+            accountWorkflow.applyTransitionWithSingleSideEffect(NeedsWelcomeEmail(initialState.id, emailAddress),
+                { needsWelcomeEmail: NeedsWelcomeEmail ->
+                    // do something that might fail - like send an email
+                    if (trickCompilerIntoReturningGoodType)
+                        failure(EmailSendFailure("invalid hostname"))
+                    else
+                        success(WelcomeMessageSent(emailTxn))
+                })
 
 
         assertEquals(
@@ -120,11 +143,12 @@ class AccountStateTest {
     fun `chained transitions`() {
         val nextState = accountWorkflow
             .applyTransition(initialState, Created(emailAddress))
-            .applyTransition(accountWorkflow, WelcomeMessageSent(emailTxn))
+            .applyTransition(WelcomeMessageSent(emailTxn))
             .orThrow()
 
         assertEquals(
             ChainableApplication(
+                accountWorkflow,
                 AccountOpen(initialState.id, openingBalance),
                 listOf(Created(emailAddress), WelcomeMessageSent(emailTxn))
             ),
@@ -138,11 +162,11 @@ class AccountStateTest {
             .applyTransition(initialState, Created(emailAddress))
             // there's no way we can know what State came out of the first transition
             // so the validity of the second transition can only be determined at runtime
-            .applyTransition(accountWorkflow, Created(emailAddress))
+            .applyTransition(Created(emailAddress))
 
         assertEquals(
             failure(
-                StateTransitionError(
+                InvalidTransitionForState(
                     NeedsWelcomeEmail(initialState.id, emailAddress),
                     Created(emailAddress)
                 )
@@ -155,13 +179,13 @@ class AccountStateTest {
     fun `chained to a doSomething`() {
         val nextState = accountWorkflow
             .applyTransition(initialState, Created(emailAddress))
-            .applyTransitionWithSideEffect(accountWorkflow, { needsWelcomeEmail: NeedsWelcomeEmail ->
+            .applyTransitionWithSingleSideEffect { needsWelcomeEmail: NeedsWelcomeEmail ->
                 // do something that might fail - like send an email
                 success(WelcomeMessageSent(emailTxn))
-            }).orThrow()
+            }.orThrow()
 
         assertEquals(
-            ChainableApplication(
+            FinalApplication(
                 AccountOpen(initialState.id, openingBalance),
                 listOf(Created(emailAddress), WelcomeMessageSent(emailTxn))
             ),
@@ -171,12 +195,13 @@ class AccountStateTest {
 
     @Test
     fun `fold to get state`() {
-        val state = listOf(
-            Created(emailAddress),
-            WelcomeMessageSent(emailTxn)
-        ).fold(initialState as AccountState, { state, transition ->
-            accountWorkflow.applyTransition(state, transition).orThrow().state
-        })
+        val state = accountWorkflow.foldOverTransitionsIntoState(
+            initialState,
+            listOf(
+                Created(emailAddress),
+                WelcomeMessageSent(emailTxn)
+            )
+        )
 
         assertEquals(AccountOpen(initialState.id, openingBalance), state)
     }

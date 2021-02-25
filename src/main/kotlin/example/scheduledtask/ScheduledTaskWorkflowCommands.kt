@@ -63,7 +63,7 @@ class ScheduledTaskCommandHandler(
             .flatMap { task ->
                 when (task) {
                     is PendingTask ->
-                        stateMachine.applyTransitionWithSideEffect(task, { pending: PendingTask ->
+                        stateMachine.applyTransitionWithSingleSideEffect(task, { pending: PendingTask ->
                             val now = clock.instant()
                             if (pending.scheduledTask.invokeAfter.isBefore(now)) {
                                 TaskStarted.asSuccess()

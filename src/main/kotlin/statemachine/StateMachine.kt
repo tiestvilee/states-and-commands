@@ -24,7 +24,7 @@ class StateMachine<S : State, T : Transition>(
     fun nextState(state: S, transition: T): Result<ErrorCode, S> =
         getTransitionFunction(state, transition::class)?.let {
             success(it(state, transition))
-        } ?: failure(StateTransitionError(state, transition))
+        } ?: failure(InvalidTransitionForState(state, transition))
 
     fun <S2 : S, T2 : T> foldOverTransitionsIntoState(initialState: S2, transitions: List<T2>) =
         transitions.fold(initialState as S,
@@ -42,10 +42,7 @@ class StateMachine<S : State, T : Transition>(
     }
 }
 
-
-data class WrongStateError(val actualState: State, val expectedState: KClass<out State>) : ErrorCode
-data class StateTransitionError(val state: State, val transition: Transition) : ErrorCode
-data class StateTransitionClassError(val state: State, val transitionClass: KClass<out Transition>) : ErrorCode
+data class InvalidTransitionForState(val state: State, val transition: Transition) : ErrorCode
 
 fun <S : State, T : Transition> StateMachine<S, T>.dot(): String {
     return """digraph {

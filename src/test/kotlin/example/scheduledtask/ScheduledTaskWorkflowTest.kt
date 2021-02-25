@@ -16,10 +16,10 @@ class ScheduledTaskWorkflowTest {
         val secondTask = ScheduledTask(Instant.now().plusSeconds(10), URI.create("http://do.this/2"))
         val initialState = NotFound()
         val endState = scheduledTaskWorkflow.applyTransition(initialState, ScheduledTaskWorkflowCreated(firstTask))
-            .applyTransition(scheduledTaskWorkflow, TaskStarted)
-            .applyTransition(scheduledTaskWorkflow, TaskExtended(secondTask))
-            .applyTransition(scheduledTaskWorkflow, TaskStarted)
-            .applyTransition(scheduledTaskWorkflow, TaskCompleted)
+            .applyTransition(TaskStarted)
+            .applyTransition(TaskExtended(secondTask))
+            .applyTransition(TaskStarted)
+            .applyTransition(TaskCompleted)
             .orThrow()
 
         assertEquals(CompleteTask(initialState.id), endState.state)
@@ -30,12 +30,23 @@ class ScheduledTaskWorkflowTest {
                 TaskExtended(secondTask),
                 TaskStarted,
                 TaskCompleted,
-            ), endState.flattenTransitions()
+            ), endState.applied
         )
     }
 
     @Test
     fun `outputs dot graph`() {
-        println(scheduledTaskWorkflow.dot())
+        assertEquals(
+            """digraph {
+  NotFound -> PendingTask [label="ScheduledTaskWorkflowCreated"]
+  PendingTask -> ExecutingTask [label="TaskStarted"]
+  ExecutingTask -> PendingTask [label="TaskFailed"]
+  ExecutingTask -> PendingTask [label="TaskExtended"]
+  ExecutingTask -> AbortedTask [label="TaskAborted"]
+  PendingTask -> AbortedTask [label="TaskAborted"]
+  ExecutingTask -> CompleteTask [label="TaskCompleted"]
+}""",
+            scheduledTaskWorkflow.dot()
+        )
     }
 }

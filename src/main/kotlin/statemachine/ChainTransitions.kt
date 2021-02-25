@@ -2,8 +2,33 @@ package statemachine
 
 import functional.ErrorCode
 import functional.Result
+import functional.Result.Companion.failure
 import functional.flatMap
 import functional.map
+import kotlin.reflect.KClass
+
+sealed class Application<S : State, T : Transition>(
+    open val state: S,
+    open val applied: List<T>
+)
+
+data class ChainableApplication<S : State, T : Transition>(
+    val stateMachine: StateMachine<S, T>,
+    override val state: S,
+    override val applied: List<T>
+) : Application<S, T>(state, applied) {
+    fun chain(state: S, transition: T) =
+        ChainableApplication(stateMachine, state, applied + transition)
+
+    fun endChain(state: S, transition: T) =
+        FinalApplication(state, applied + transition)
+
+}
+
+data class FinalApplication<S : State, T : Transition>(
+    override val state: S,
+    override val applied: List<T>
+) : Application<S, T>(state, applied)
 
 fun <S : State, T : Transition> StateMachine<S, T>.applyTransition(
     state: S,
@@ -11,56 +36,43 @@ fun <S : State, T : Transition> StateMachine<S, T>.applyTransition(
 ): Result<ErrorCode, ChainableApplication<S, T>> =
     nextState(state, transition)
         .map {
-            ChainableApplication(it, listOf(transition))
+            ChainableApplication(this, it, listOf(transition))
         }
 
-inline fun <S : State, T : Transition, S2 : S, reified T2 : T> StateMachine<S, T>.applyTransitionWithSideEffect(
+inline fun <S : State, T : Transition, S2 : S, reified T2 : T> StateMachine<S, T>.applyTransitionWithSingleSideEffect(
     state: S2,
     tryThis: (S2) -> Result<ErrorCode, T2>
-): Result<ErrorCode, Application<S, T>> =
+): Result<ErrorCode, FinalApplication<S, T>> =
     this.getTransitionFunction(state, T2::class)?.let { fn ->
         tryThis(state)
             .map { transition ->
-                ChainableApplication(fn(state, transition), listOf(transition))
+                FinalApplication(fn(state, transition), listOf(transition))
             }
-    } ?: Result.failure(StateTransitionClassError(state, T2::class))
+    } ?: failure(InvalidTransitionClassForState(state, T2::class))
 
-open class Application<S : State, T : Transition>(
-    open val state: S,
-    open val applied: List<T>
-) {
-    fun flattenTransitions(): List<T> = applied
-}
-
-data class ChainableApplication<S : State, T : Transition>(
-    override val state: S,
-    override val applied: List<T>
-) : Application<S, T>(state, applied)
-
-fun <S : State, T : Transition> Result<ErrorCode, ChainableApplication<S, T>>.applyTransition(
-    stateMachine: StateMachine<S, T>,
-    transition: T
-): Result<ErrorCode, ChainableApplication<S, T>> =
+fun <S : State, T : Transition> Result<ErrorCode, ChainableApplication<S, T>>.applyTransition(transition: T): Result<ErrorCode, ChainableApplication<S, T>> =
     this.flatMap { chain ->
-        stateMachine.nextState(chain.state, transition)
+        chain.stateMachine.nextState(chain.state, transition)
             .map {
-                ChainableApplication(it, chain.applied + transition)
+                chain.chain(it, transition)
             }
     }
 
-inline fun <S : State, T : Transition, reified S2 : S, reified T2 : T> Result<ErrorCode, ChainableApplication<S, T>>.applyTransitionWithSideEffect(
-    stateMachine: StateMachine<S, T>,
+inline fun <S : State, T : Transition, reified S2 : S, reified T2 : T> Result<ErrorCode, ChainableApplication<S, T>>.applyTransitionWithSingleSideEffect(
     tryThis: (S2) -> Result<ErrorCode, T2>
-): Result<ErrorCode, Application<S, T>> =
-    this.flatMap {
-        if (it.state is S2) {
-            stateMachine.getTransitionFunction(it.state, T2::class)?.let { fn ->
-                tryThis(it.state)
+): Result<ErrorCode, FinalApplication<S, T>> =
+    this.flatMap { chain ->
+        if (chain.state is S2) {
+            chain.stateMachine.getTransitionFunction(chain.state, T2::class)?.let { fn ->
+                tryThis(chain.state)
                     .map { transition ->
-                        ChainableApplication(fn(it.state, transition), it.applied + transition)
+                        chain.endChain(fn(chain.state, transition), transition)
                     }
-            } ?: Result.failure(StateTransitionClassError(it.state, T2::class))
+            } ?: failure(InvalidTransitionClassForState(chain.state, T2::class))
         } else {
-            Result.failure(WrongStateError(it.state, S2::class))
+            failure(UnexpectedState(chain.state, S2::class))
         }
     }
+
+data class UnexpectedState(val actualState: State, val expectedState: KClass<out State>) : ErrorCode
+data class InvalidTransitionClassForState(val state: State, val transitionClass: KClass<out Transition>) : ErrorCode

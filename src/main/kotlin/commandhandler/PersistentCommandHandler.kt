@@ -20,7 +20,7 @@ class PersistentCommandHandler<C : Command, S : StateWithId, T : Transition>(
     override fun invoke(command: C): Result<ErrorCode, Application<S, T>> {
         return delegate.invoke(command)
             .onEach { application ->
-                application.flattenTransitions()
+                application.applied
                     .map {
                         saveTransition(application.state.id, it)
                     }
