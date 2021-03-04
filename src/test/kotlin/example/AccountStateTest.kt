@@ -27,7 +27,8 @@ class AccountStateTest {
             ChainableApplication(
                 accountWorkflow,
                 NeedsWelcomeEmail(initialState.id, emailAddress),
-                listOf(Created(emailAddress))
+                listOf(Created(emailAddress)),
+                listOf(initialState)
             ),
             application
         )
@@ -38,7 +39,8 @@ class AccountStateTest {
             ChainableApplication(
                 accountWorkflow,
                 AccountOpen(initialState.id, openingBalance),
-                listOf(WelcomeMessageSent(emailTxn))
+                listOf(WelcomeMessageSent(emailTxn)),
+                listOf(application.state)
             ),
             finalState
         )
@@ -56,9 +58,11 @@ class AccountStateTest {
 
     @Test
     fun `dosomething in the transition`() {
+        val startingPoint = NeedsWelcomeEmail(initialState.id, emailAddress)
 
         val nextState =
-            accountWorkflow.applyTransitionWithSingleSideEffect(NeedsWelcomeEmail(initialState.id, emailAddress),
+            accountWorkflow.applyTransitionWithSingleSideEffect(
+                startingPoint,
                 { _: NeedsWelcomeEmail ->
                     // do something that might fail - like send an email
                     success(WelcomeMessageSent(emailTxn))
@@ -67,7 +71,8 @@ class AccountStateTest {
         assertEquals(
             FinalApplication(
                 AccountOpen(initialState.id, openingBalance),
-                listOf(WelcomeMessageSent(emailTxn))
+                listOf(WelcomeMessageSent(emailTxn)),
+                listOf(startingPoint)
             ),
             nextState
         )
@@ -110,6 +115,7 @@ class AccountStateTest {
         assertFalse(performedAction, "shouldn't be called because state is invalid")
     }
 
+    @Suppress("UNUSED_VARIABLE")
     @Test
     fun `state of sied effect function doesn't match expected state causes compile time error`() {
         val tryThis: (NeedsWelcomeEmail) -> Result<ErrorCode, WelcomeMessageSent> =
@@ -169,7 +175,8 @@ class AccountStateTest {
             ChainableApplication(
                 accountWorkflow,
                 AccountOpen(initialState.id, openingBalance),
-                listOf(Created(emailAddress), WelcomeMessageSent(emailTxn))
+                listOf(Created(emailAddress), WelcomeMessageSent(emailTxn)),
+                listOf(initialState, NeedsWelcomeEmail(initialState.id, emailAddress))
             ),
             nextState
         )
@@ -206,7 +213,8 @@ class AccountStateTest {
         assertEquals(
             FinalApplication(
                 AccountOpen(initialState.id, openingBalance),
-                listOf(Created(emailAddress), WelcomeMessageSent(emailTxn))
+                listOf(Created(emailAddress), WelcomeMessageSent(emailTxn)),
+                listOf(initialState, NeedsWelcomeEmail(initialState.id, emailAddress))
             ),
             nextState
         )

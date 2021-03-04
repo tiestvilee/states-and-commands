@@ -9,26 +9,29 @@ import kotlin.reflect.KClass
 
 sealed class Application<S : State, T : Transition>(
     open val state: S,
-    open val applied: List<T>
+    open val applied: List<T>,
+    open val stateHistory: List<S>
 )
 
 data class ChainableApplication<S : State, T : Transition>(
     val stateMachine: StateMachine<S, T>,
     override val state: S,
-    override val applied: List<T>
-) : Application<S, T>(state, applied) {
-    fun chain(state: S, transition: T) =
-        ChainableApplication(stateMachine, state, applied + transition)
+    override val applied: List<T>,
+    override val stateHistory: List<S> = emptyList()
+) : Application<S, T>(state, applied, stateHistory) {
+    fun chain(newState: S, transition: T) =
+        ChainableApplication(stateMachine, newState, applied + transition, stateHistory + state)
 
-    fun endChain(state: S, transition: T) =
-        FinalApplication(state, applied + transition)
+    fun endChain(newState: S, transition: T) =
+        FinalApplication(newState, applied + transition, stateHistory + state)
 
 }
 
 data class FinalApplication<S : State, T : Transition>(
     override val state: S,
-    override val applied: List<T>
-) : Application<S, T>(state, applied)
+    override val applied: List<T>,
+    override val stateHistory: List<S> = emptyList()
+) : Application<S, T>(state, applied, stateHistory)
 
 fun <S : State, T : Transition> StateMachine<S, T>.applyTransition(
     state: S,
@@ -36,7 +39,7 @@ fun <S : State, T : Transition> StateMachine<S, T>.applyTransition(
 ): Result<ErrorCode, ChainableApplication<S, T>> =
     nextState(state, transition)
         .map {
-            ChainableApplication(this, it, listOf(transition))
+            ChainableApplication(this, it, listOf(transition), listOf(state))
         }
 
 inline fun <S : State, T : Transition, reified S2 : S, reified T2 : T> StateMachine<S, T>.applyTransitionWithSingleSideEffect(
@@ -47,7 +50,7 @@ inline fun <S : State, T : Transition, reified S2 : S, reified T2 : T> StateMach
         this.getTransitionFunction(state, T2::class)?.let { fn ->
             tryThis(state)
                 .map { transition ->
-                    FinalApplication(fn(state, transition), listOf(transition))
+                    FinalApplication(fn(state, transition), listOf(transition), listOf(state))
                 }
         } ?: failure(InvalidTransitionClassForState(state, T2::class))
     } else {
