@@ -1,7 +1,5 @@
 package example.eligibilityworkflow
 
-import example.eligibilityworkflow.InstitutionDecision.ApprovedInstitutionDecision
-import example.eligibilityworkflow.InstitutionDecision.RejectedInstitutionDecision
 import statemachine.State
 import statemachine.StateMachine
 import statemachine.Transition
@@ -10,23 +8,22 @@ import java.net.URI
 
 /* Workflow */
 val eligibilityWorkflow = StateMachine<EligibilityWorkflowState, EligibilityWorkflowEvent>()
-    .defineStateTransition { initialState: NotFound, event: Created ->
-        if (event.journalPublishingModel == JournalPublishingModel.Subscription)
-            DecidedAsSubscription(
-                event.eligibilityWorkflowId,
-                event.articleInfo,
-                event.journalPublishingModel,
-                false,
-                event.mirageLink
-            )
-        else
-            WaitingForEligibilityCriteria(
-                event.eligibilityWorkflowId,
-                event.articleInfo,
-                event.journalPublishingModel,
-                event.mirageLink
-            )
-
+    .defineStateTransition { initialState: NotFound, event: CreatedEligibilityWorkflow ->
+        WaitingForEligibilityCriteria(
+            event.eligibilityWorkflowId,
+            event.articleInfo,
+            event.journalPublishingModel,
+            event.mirageLink
+        )
+    }
+    .defineStateTransition { initialState: NotFound, event: CreatedSubscriptionWorkflow ->
+        MustBeSubscription(
+            event.eligibilityWorkflowId,
+            event.articleInfo,
+            event.journalPublishingModel,
+            false,
+            event.mirageLink
+        )
     }
     .defineStateTransition { state: WaitingForEligibilityCriteria, event: EligibilityCriteriaCollected ->
         WaitingForEligibilityResult(
@@ -67,7 +64,7 @@ val eligibilityWorkflow = StateMachine<EligibilityWorkflowState, EligibilityWork
         )
     }
     .defineStateTransition { state: WaitingForAuthorConfirmation, event: AuthorChoseSubscription ->
-        DecidedAsSubscription(
+        MustBeSubscription(
             event.eligibilityWorkflowId,
             state.articleInfo,
             state.journalPublishingModel,
@@ -93,27 +90,26 @@ val eligibilityWorkflow = StateMachine<EligibilityWorkflowState, EligibilityWork
             state.contract
         )
     }
-    .defineStateTransition { state: WaitingForAuthorConfirmation, event: ApprovedByInstitution ->
-        WaitingToNotifyDecision(
+    .defineStateTransition { state: WaitingForInstitutionApproval, event: ApprovedByInstitution ->
+        WaitingToNotifyApprovalDecision(
             event.eligibilityWorkflowId,
             state.articleInfo,
             state.journalPublishingModel,
-            ApprovedInstitutionDecision,
             state.mirageLink,
             state.contract
         )
     }
-    .defineStateTransition { state: WaitingToNotifyDecision, event: AuthorNotifiedDecision ->
-        when (state.institutionDecision) {
-            ApprovedInstitutionDecision -> DecidedAsOAInDeal(event.eligibilityWorkflowId)
-            RejectedInstitutionDecision -> WaitingForPublishingModelChoice(
-                event.eligibilityWorkflowId,
-                state.articleInfo,
-                state.journalPublishingModel,
-                true,
-                state.mirageLink
-            )
-        }
+    .defineStateTransition { state: WaitingToNotifyApprovalDecision, event: AuthorNotifiedDecision ->
+        DecidedAsOAInDeal(event.eligibilityWorkflowId)
+    }
+    .defineStateTransition { state: WaitingToNotifyRejectionDecision, event: AuthorNotifiedDecision ->
+        WaitingForPublishingModelChoice(
+            event.eligibilityWorkflowId,
+            state.articleInfo,
+            state.journalPublishingModel,
+            true,
+            state.mirageLink
+        )
     }
     .defineStateTransition { state: WaitingForAuthorConfirmation, event: ResetWorkflow ->
         WaitingForEligibilityCriteria(
@@ -150,11 +146,10 @@ val eligibilityWorkflow = StateMachine<EligibilityWorkflowState, EligibilityWork
         )
     }
     .defineStateTransition { state: WaitingForInstitutionApproval, event: RejectedByInstitution ->
-        WaitingToNotifyDecision(
+        WaitingToNotifyRejectionDecision(
             event.eligibilityWorkflowId,
             state.articleInfo,
             state.journalPublishingModel,
-            RejectedInstitutionDecision,
             state.mirageLink,
             state.contract
         )
@@ -205,20 +200,7 @@ data class WaitingForEligibilityResult internal constructor(
     val journalPublishingModel: JournalPublishingModel,
     val eligibilityMatches: AllEligibilityMatches,
     val mirageLink: URI
-) : EligibilityWorkflowState() {
-    fun notEligibleForDeal() =
-        WaitingForPublishingModelChoice(eligibilityId, articleInfo, journalPublishingModel, false, mirageLink)
-
-    fun eligibleForDeal(contract: Contract, priceInformation: ContractPriceInformation?) = WaitingForAuthorConfirmation(
-        eligibilityId,
-        articleInfo,
-        eligibilityMatches,
-        contract,
-        journalPublishingModel,
-        mirageLink,
-        priceInformation
-    )
-}
+) : EligibilityWorkflowState()
 
 data class WaitingForPublishingModelChoice internal constructor(
     override val eligibilityId: EligibilityWorkflowId,
@@ -226,15 +208,7 @@ data class WaitingForPublishingModelChoice internal constructor(
     val journalPublishingModel: JournalPublishingModel,
     val rejectedByInstitution: Boolean,
     val mirageLink: URI
-) : EligibilityWorkflowState() {
-    fun openAccess() =
-        DecidedAsOAOutsideDeal(eligibilityId, articleInfo, journalPublishingModel, rejectedByInstitution, mirageLink)
-
-    fun subscription() =
-        DecidedAsSubscription(eligibilityId, articleInfo, journalPublishingModel, rejectedByInstitution, mirageLink)
-
-    fun resetWorkflow() = WaitingForEligibilityCriteria(eligibilityId, articleInfo, journalPublishingModel, mirageLink)
-}
+) : EligibilityWorkflowState()
 
 data class WaitingForAuthorConfirmation internal constructor(
     override val eligibilityId: EligibilityWorkflowId,
@@ -244,13 +218,7 @@ data class WaitingForAuthorConfirmation internal constructor(
     val journalPublishingModel: JournalPublishingModel,
     val mirageLink: URI,
     val contractPriceInformation: ContractPriceInformation?
-) : EligibilityWorkflowState() {
-    fun toWaitingForInstitutionApproval() =
-        WaitingForInstitutionApproval(eligibilityId, articleInfo, journalPublishingModel, mirageLink, contract)
-
-    fun optout() = DecidedAsSubscription(eligibilityId, articleInfo, journalPublishingModel, false, mirageLink)
-    fun resetWorkflow() = WaitingForEligibilityCriteria(eligibilityId, articleInfo, journalPublishingModel, mirageLink)
-}
+) : EligibilityWorkflowState()
 
 data class WaitingForInstitutionApproval internal constructor(
     override val eligibilityId: EligibilityWorkflowId,
@@ -258,37 +226,23 @@ data class WaitingForInstitutionApproval internal constructor(
     val journalPublishingModel: JournalPublishingModel,
     val mirageLink: URI,
     val contract: Contract
-) : EligibilityWorkflowState() {
-    fun approved() = WaitingToNotifyDecision(
-        eligibilityId, articleInfo, journalPublishingModel,
-        ApprovedInstitutionDecision, mirageLink, contract
-    )
+) : EligibilityWorkflowState()
 
-    fun rejected() = WaitingToNotifyDecision(
-        eligibilityId, articleInfo, journalPublishingModel,
-        RejectedInstitutionDecision, mirageLink, contract
-    )
-}
-
-data class WaitingToNotifyDecision internal constructor(
+data class WaitingToNotifyRejectionDecision internal constructor(
     override val eligibilityId: EligibilityWorkflowId,
     val articleInfo: ArticleInfo,
     val journalPublishingModel: JournalPublishingModel,
-    val institutionDecision: InstitutionDecision,
     val mirageLink: URI,
     val contract: Contract
-) : EligibilityWorkflowState() {
-    fun notified() = when (institutionDecision) {
-        ApprovedInstitutionDecision -> DecidedAsOAInDeal(eligibilityId)
-        RejectedInstitutionDecision -> WaitingForPublishingModelChoice(
-            eligibilityId,
-            articleInfo,
-            journalPublishingModel,
-            true,
-            mirageLink
-        )
-    }
-}
+) : EligibilityWorkflowState()
+
+data class WaitingToNotifyApprovalDecision internal constructor(
+    override val eligibilityId: EligibilityWorkflowId,
+    val articleInfo: ArticleInfo,
+    val journalPublishingModel: JournalPublishingModel,
+    val mirageLink: URI,
+    val contract: Contract
+) : EligibilityWorkflowState()
 
 data class DecidedAsSubscription internal constructor(
     override val eligibilityId: EligibilityWorkflowId,
@@ -296,15 +250,15 @@ data class DecidedAsSubscription internal constructor(
     val journalPublishingModel: JournalPublishingModel,
     val rejectedByInstitution: Boolean,
     val mirageLink: URI
-) : EligibilityWorkflowState() {
-    fun resetPublishingModelChoice() = WaitingForPublishingModelChoice(
-        eligibilityId,
-        articleInfo,
-        journalPublishingModel,
-        rejectedByInstitution,
-        mirageLink
-    )
-}
+) : EligibilityWorkflowState()
+
+data class MustBeSubscription internal constructor(
+    override val eligibilityId: EligibilityWorkflowId,
+    val articleInfo: ArticleInfo,
+    val journalPublishingModel: JournalPublishingModel,
+    val rejectedByInstitution: Boolean,
+    val mirageLink: URI
+) : EligibilityWorkflowState()
 
 data class DecidedAsOAInDeal internal constructor(
     override val eligibilityId: EligibilityWorkflowId
@@ -316,15 +270,7 @@ data class DecidedAsOAOutsideDeal internal constructor(
     val journalPublishingModel: JournalPublishingModel,
     val rejectedByInstitution: Boolean,
     val mirageLink: URI
-) : EligibilityWorkflowState() {
-    fun resetPublishingModelChoice() = WaitingForPublishingModelChoice(
-        eligibilityId,
-        articleInfo,
-        journalPublishingModel,
-        rejectedByInstitution,
-        mirageLink
-    )
-}
+) : EligibilityWorkflowState()
 
 data class WaitingForExternalEligibilityDecision internal constructor(
     override val eligibilityId: EligibilityWorkflowId,
@@ -337,14 +283,20 @@ data class HasBeenAborted(
     override val eligibilityId: EligibilityWorkflowId
 ) : EligibilityWorkflowState()
 
-enum class InstitutionDecision { ApprovedInstitutionDecision, RejectedInstitutionDecision }
-
 /* Transitions */
 sealed class EligibilityWorkflowEvent : Transition {
     abstract val eligibilityWorkflowId: EligibilityWorkflowId
 }
 
-data class Created(
+data class CreatedEligibilityWorkflow(
+    override val eligibilityWorkflowId: EligibilityWorkflowId,
+    val articleInfo: ArticleInfo,
+    val journalPublishingModel: JournalPublishingModel,
+    val eligibilityMatches: AllEligibilityMatches,
+    val mirageLink: URI
+) : EligibilityWorkflowEvent()
+
+data class CreatedSubscriptionWorkflow(
     override val eligibilityWorkflowId: EligibilityWorkflowId,
     val articleInfo: ArticleInfo,
     val journalPublishingModel: JournalPublishingModel,
