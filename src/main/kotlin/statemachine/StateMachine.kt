@@ -46,6 +46,9 @@ data class InvalidTransitionForState(val state: State, val transition: Transitio
 
 fun <S : State, T : Transition> StateMachine<S, T>.dot(): String {
     return """digraph {
+    |  pad=0.4;
+    |  nodesep=0.5;
+    |  ranksep=0.8;
     |${
         stateTransitionTable.entries.flatMap {
             it.value::class.java.declaredMethods.toList()
