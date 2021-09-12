@@ -178,6 +178,9 @@ val eligibilityWorkflow = StateMachine<EligibilityWorkflowState, EligibilityWork
     .defineStateTransition { state: WaitingForExternalEligibilityDecision, event: ExternalEligibilityInDeal ->
         DecidedAsOAInDeal(event.eligibilityWorkflowId)
     }
+    .forAllStatesAddTransition(listOf(HasBeenAborted::class)) { state: EligibilityWorkflowState, event: Aborted ->
+        HasBeenAborted(event.eligibilityWorkflowId)
+    }
 
 
 /* States */

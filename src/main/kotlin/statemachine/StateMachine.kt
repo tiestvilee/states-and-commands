@@ -40,21 +40,69 @@ class StateMachine<S : State, T : Transition>(
             Pair(Pair(stateClass, transitionClass), function as (S, T) -> S)
         return StateMachine(stateTransitionTable + newStateTransition)
     }
+
+    @Suppress("UNCHECKED_CAST")
+    inline fun <reified T2 : T> defineStateTransitions(
+        states: List<KClass<out S>>,
+        noinline function: (S, T2) -> S
+    ): StateMachine<S, T> {
+        val transitions: List<Pair<Pair<KClass<S>, KClass<T>>, (S, T) -> S>> = states.map { state ->
+            Pair(Pair(state, T2::class), function) as Pair<Pair<KClass<S>, KClass<T>>, (S, T) -> S>
+        }.toList()
+        return StateMachine(stateTransitionTable + transitions)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    inline fun <S1 : S, reified T2 : T, S3 : S> forAllStatesAddTransition(
+        except: List<KClass<out S>> = emptyList(),
+        noinline function: (S1, T2) -> S3
+    ): StateMachine<S, T> {
+        val transitions = stateTransitionTable.keys
+            .asSequence()
+            .map { it.first }
+            .toSet()
+            .filterNot { except.contains(it) }
+            .fold(stateTransitionTable) { table, state ->
+                table + Pair(Pair(state, T2::class), function as (S, T) -> S)
+            }
+        return StateMachine(transitions)
+    }
 }
 
 data class InvalidTransitionForState(val state: State, val transition: Transition) : ErrorCode
 
-fun <S : State, T : Transition> StateMachine<S, T>.dot(): String {
-    return """digraph {
-    |  pad=0.4;
-    |  nodesep=0.5;
-    |  ranksep=0.8;
-    |${
-        stateTransitionTable.entries.flatMap {
-            it.value::class.java.declaredMethods.toList()
-        }
+fun <S : State, T : Transition> StateMachine<S, T>.puml(): String {
+    // find entry point
+    val allStates: Set<Class<*>> = stateTransitionTable.keys.map {
+        it.first.javaObjectType
+    }.toSet()
+
+    val statesWithIncomingTransitions: Set<Class<*>> = stateTransitionTable.values.map { value ->
+        value::class.java.declaredMethods.toList()
             .filterNot { it.parameterTypes[0].isInstance(State::class.java) }
-            .joinToString("\n") { """  ${it.parameterTypes[0].simpleName} -> ${it.returnType.simpleName} [label="${it.parameterTypes[1].simpleName}"]""" }
+            .map { it.returnType }
+            .first()
+    }.toSet()
+
+    val firstStates = allStates - statesWithIncomingTransitions
+
+    return """@startuml
+        |${
+        firstStates.map {
+            """  [*] --> ${it.simpleName}"""
+        }.joinToString("\n")
     }
-    |}""".trimMargin()
+        |${
+        stateTransitionTable.entries.map { entry ->
+            Pair(
+                entry.key,
+                entry.value::class.java.declaredMethods.toList()
+                    .filterNot { it.parameterTypes[0].isInstance(State::class.java) }
+                    .map { it.returnType.simpleName }
+                    .first()
+            )
+        }
+            .joinToString("\n") { pair -> """  ${pair.first.first.simpleName} --> ${pair.second} : ${pair.first.second.simpleName}""" }
+    }
+        |@enduml""".trimMargin()
 }

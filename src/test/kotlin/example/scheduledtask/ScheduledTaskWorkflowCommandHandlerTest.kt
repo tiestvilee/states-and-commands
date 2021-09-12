@@ -7,6 +7,7 @@ import functional.map
 import functional.orThrow
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.io.File
 import java.net.URI
 import java.time.Clock
 import java.time.Instant
@@ -50,7 +51,8 @@ class ScheduledTaskWorkflowCommandHandlerTest {
 
         assertEquals(CompleteTask(entityId), state)
 
-        println(dottyHandler.uml())
+        File("src/test/kotlin/example/scheduledtask/command.puml")
+            .writeText(dottyHandler.uml())
     }
 }
 

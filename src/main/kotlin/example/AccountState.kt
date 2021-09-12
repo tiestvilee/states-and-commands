@@ -22,7 +22,7 @@ val accountWorkflow = StateMachine<AccountState, AccountTransition>()
         Overdrawn(accountOpen.id, overdraw.balance)
     }
     .defineStateTransition { overdrawn: Overdrawn, updateBalance: UpdateBalance ->
-        Overdrawn(overdrawn.id, updateBalance.balance)
+        AccountOpen(overdrawn.id, updateBalance.balance)
     }
 
 sealed class AccountState : State {

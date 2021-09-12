@@ -4,7 +4,8 @@ import functional.orThrow
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import statemachine.applyTransition
-import statemachine.dot
+import statemachine.puml
+import java.io.File
 import java.net.URI
 import java.time.Instant
 
@@ -36,17 +37,23 @@ class ScheduledTaskWorkflowTest {
 
     @Test
     fun `outputs dot graph`() {
+        val uml = scheduledTaskWorkflow.puml()
+        File("src/test/kotlin/example/scheduledtask/states.puml")
+            .writeText(uml)
+
         assertEquals(
-            """digraph {
-  NotFound -> PendingTask [label="ScheduledTaskWorkflowCreated"]
-  PendingTask -> ExecutingTask [label="TaskStarted"]
-  ExecutingTask -> PendingTask [label="TaskFailed"]
-  ExecutingTask -> PendingTask [label="TaskExtended"]
-  ExecutingTask -> AbortedTask [label="TaskAborted"]
-  PendingTask -> AbortedTask [label="TaskAborted"]
-  ExecutingTask -> CompleteTask [label="TaskCompleted"]
-}""",
-            scheduledTaskWorkflow.dot()
+            """@startuml
+  [*] --> NotFound
+  NotFound --> PendingTask : ScheduledTaskWorkflowCreated
+  PendingTask --> ExecutingTask : TaskStarted
+  ExecutingTask --> PendingTask : TaskFailed
+  ExecutingTask --> PendingTask : TaskExtended
+  ExecutingTask --> AbortedTask : TaskAborted
+  PendingTask --> AbortedTask : TaskAborted
+  ExecutingTask --> CompleteTask : TaskCompleted
+@enduml""",
+            uml
         )
+
     }
 }

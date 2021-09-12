@@ -1,12 +1,12 @@
 package example.eligibilityworkflow
 
 import org.junit.Test
-import statemachine.dot
+import statemachine.puml
 
 class EligibilityWorkflowTest {
     @Test
     fun `outputs dot graph`() {
-        println(eligibilityWorkflow.dot())
+        println(eligibilityWorkflow.puml())
     }
 
 }
