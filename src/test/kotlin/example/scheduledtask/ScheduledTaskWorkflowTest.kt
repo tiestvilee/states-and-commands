@@ -51,6 +51,8 @@ class ScheduledTaskWorkflowTest {
   ExecutingTask --> AbortedTask : TaskAborted
   PendingTask --> AbortedTask : TaskAborted
   ExecutingTask --> CompleteTask : TaskCompleted
+  AbortedTask --> [*]
+  CompleteTask --> [*]
 @enduml""",
             uml
         )

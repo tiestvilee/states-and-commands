@@ -73,18 +73,22 @@ data class InvalidTransitionForState(val state: State, val transition: Transitio
 
 fun <S : State, T : Transition> StateMachine<S, T>.puml(): String {
     // find entry point
-    val allStates: Set<Class<*>> = stateTransitionTable.keys.map {
-        it.first.javaObjectType
-    }.toSet()
+    val statesWithOutgoingTransitions: MutableSet<Class<*>> = mutableSetOf()
+    val statesWithIncomingTransitions: MutableSet<Class<*>> = mutableSetOf()
 
-    val statesWithIncomingTransitions: Set<Class<*>> = stateTransitionTable.values.map { value ->
-        value::class.java.declaredMethods.toList()
+    stateTransitionTable.entries.forEach { entry ->
+        statesWithIncomingTransitions += entry.value::class.java.declaredMethods.toList()
             .filterNot { it.parameterTypes[0].isInstance(State::class.java) }
             .map { it.returnType }
             .first()
-    }.toSet()
+        statesWithOutgoingTransitions += entry.key.first.javaObjectType
+    }
 
-    val firstStates = allStates - statesWithIncomingTransitions
+    println(statesWithIncomingTransitions)
+    println(statesWithOutgoingTransitions)
+
+    val firstStates = statesWithOutgoingTransitions - statesWithIncomingTransitions
+    val lastStates = statesWithIncomingTransitions - statesWithOutgoingTransitions
 
     return """@startuml
         |${
@@ -103,6 +107,11 @@ fun <S : State, T : Transition> StateMachine<S, T>.puml(): String {
             )
         }
             .joinToString("\n") { pair -> """  ${pair.first.first.simpleName} --> ${pair.second} : ${pair.first.second.simpleName}""" }
+    }
+    |${
+        lastStates.map {
+            """  ${it.simpleName} --> [*]"""
+        }.joinToString("\n")
     }
         |@enduml""".trimMargin()
 }
