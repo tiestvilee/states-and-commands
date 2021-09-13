@@ -9,14 +9,6 @@ group StartTask
   PendingTask -> ExecutingTask : TaskStarted"
 
 end
-group RecordTaskSuccessAndExtend
-  ExecutingTask -> PendingTask : TaskExtended"
-
-end
-group StartTask
-  PendingTask -> ExecutingTask : TaskStarted"
-
-end
 group RecordTaskSuccessAndComplete
   ExecutingTask -> CompleteTask : TaskCompleted"
 
