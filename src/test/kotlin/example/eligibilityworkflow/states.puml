@@ -1,0 +1,35 @@
+@startuml
+  [*] --> NotFound
+  NotFound --> WaitingForEligibilityCriteria : CreatedEligibilityWorkflow
+  NotFound --> MustBeSubscription : CreatedSubscriptionWorkflow
+  WaitingForEligibilityCriteria --> WaitingForEligibilityResult : EligibilityCriteriaCollected
+  WaitingForEligibilityResult --> WaitingForPublishingModelChoice : NoDealFound
+  WaitingForEligibilityResult --> WaitingForAuthorConfirmation : DealFound
+  WaitingForPublishingModelChoice --> DecidedAsSubscription : AuthorChoseSubscription
+  WaitingForAuthorConfirmation --> MustBeSubscription : AuthorChoseSubscription
+  WaitingForPublishingModelChoice --> DecidedAsOAOutsideDeal : AuthorChoseOA
+  WaitingForAuthorConfirmation --> WaitingForInstitutionApproval : ApprovalRequested
+  WaitingForInstitutionApproval --> WaitingToNotifyApprovalDecision : ApprovedByInstitution
+  WaitingToNotifyApprovalDecision --> DecidedAsOAInDeal : AuthorNotifiedDecision
+  WaitingToNotifyRejectionDecision --> WaitingForPublishingModelChoice : AuthorNotifiedDecision
+  WaitingForAuthorConfirmation --> WaitingForEligibilityCriteria : ResetWorkflow
+  WaitingForPublishingModelChoice --> WaitingForEligibilityCriteria : ResetWorkflow
+  DecidedAsSubscription --> WaitingForPublishingModelChoice : PublishingModelChoiceReset
+  DecidedAsOAOutsideDeal --> WaitingForPublishingModelChoice : PublishingModelChoiceReset
+  WaitingForInstitutionApproval --> WaitingToNotifyRejectionDecision : RejectedByInstitution
+  WaitingForEligibilityCriteria --> WaitingForExternalEligibilityDecision : ExternalEligibilityRequested
+  WaitingForExternalEligibilityDecision --> DecidedAsOAOutsideDeal : ExternalEligibilityOutsideDeal
+  WaitingForExternalEligibilityDecision --> DecidedAsOAInDeal : ExternalEligibilityInDeal
+  NotFound --> HasBeenAborted : Aborted
+  WaitingForEligibilityCriteria --> HasBeenAborted : Aborted
+  WaitingForEligibilityResult --> HasBeenAborted : Aborted
+  WaitingForPublishingModelChoice --> HasBeenAborted : Aborted
+  WaitingForAuthorConfirmation --> HasBeenAborted : Aborted
+  WaitingForInstitutionApproval --> HasBeenAborted : Aborted
+  WaitingToNotifyApprovalDecision --> HasBeenAborted : Aborted
+  WaitingToNotifyRejectionDecision --> HasBeenAborted : Aborted
+  WaitingForExternalEligibilityDecision --> HasBeenAborted : Aborted
+  MustBeSubscription --> [*]
+  DecidedAsOAInDeal --> [*]
+  HasBeenAborted --> [*]
+@enduml

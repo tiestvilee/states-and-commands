@@ -1,0 +1,12 @@
+@startuml
+  [*] --> NotFound
+  NotFound --> PendingTask : ScheduledTaskWorkflowCreated
+  PendingTask --> ExecutingTask : TaskStarted
+  ExecutingTask --> PendingTask : TaskFailed
+  ExecutingTask --> PendingTask : TaskExtended
+  ExecutingTask --> AbortedTask : TaskAborted
+  PendingTask --> AbortedTask : TaskAborted
+  ExecutingTask --> CompleteTask : TaskCompleted
+  AbortedTask --> [*]
+  CompleteTask --> [*]
+@enduml
