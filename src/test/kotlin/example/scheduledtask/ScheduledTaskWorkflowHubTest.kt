@@ -3,6 +3,7 @@ package example.scheduledtask
 import commandhandler.InMemoryPersistence
 import commandhandler.PersistentCommandHandler
 import commandhandler.UmlCommandHandler
+import commandhandler.UmlRenderer
 import functional.Result
 import functional.map
 import functional.orThrow
@@ -34,7 +35,7 @@ class TickingClock : Clock() {
 
 class ScheduledTaskWorkflowHubTest {
     @Test
-    fun `can apply a bunch of commands`() {
+    fun `can call a bunch of hub endpoints`() {
         val datasource = InMemoryPersistence<ScheduledTaskWorkflowEvent>()
         val tickingClock = TickingClock()
 
@@ -52,7 +53,8 @@ class ScheduledTaskWorkflowHubTest {
             commandHandler,
             datasource::save
         )
-        val dottyHandler = UmlCommandHandler(persistentHandler, object {}.javaClass.enclosingMethod.name)
+        val umlRenderer = UmlRenderer(object {}.javaClass.enclosingMethod.name)
+        val dottyHandler = UmlCommandHandler(persistentHandler, umlRenderer)
 
         val handler = dottyHandler
 
@@ -60,12 +62,15 @@ class ScheduledTaskWorkflowHubTest {
         val secondTask = ScheduledTask(tickingClock.instant().plusSeconds(5), URI.create("http://do.this/2"))
         var returnSecondTask = true
 
-        val hub = ScheduledTaskWorkflowHub(
-            handler,
-            PendingJobsProjection(tickingClock)
-        ) { uri ->
-            Result.Success(if (returnSecondTask) secondTask else null)
-        }
+        val hub = UmlScheduledTaskWorflowHub(
+            ScheduledTaskWorkflowHubImpl(
+                handler,
+                PendingJobsProjection(tickingClock)
+            ) {
+                Result.Success(if (returnSecondTask) secondTask else null)
+            },
+            umlRenderer
+        )
 
         val result = hub.createTask(firstTask).orThrow()
         returnSecondTask = true
@@ -80,7 +85,7 @@ class ScheduledTaskWorkflowHubTest {
             }.orThrow()
 
         File("src/test/kotlin/example/scheduledtask/hub.puml")
-            .writeText(dottyHandler.uml())
+            .writeText(umlRenderer.toUml())
 
         assertEquals(CompleteTask(result.state.id), state)
     }

@@ -6,37 +6,52 @@ import functional.onEach
 import statemachine.Application
 import statemachine.Transition
 
-class UmlCommandHandler<C : Command, S : StateWithId, T : Transition>(
-    val delegate: CommandHandler<C, S, T>,
-    umlTitle: String
-) : CommandHandler<C, S, T> {
+class UmlRenderer(private val umlTitle: String) {
+    private val umlBody = StringBuilder()
+    fun append(append: String) {
+        umlBody.append(append)
+    }
 
-    var uml = """@startuml
+    fun toUml() = """@startuml
 ' skinparam responseMessageBelowArrow true
 title $umlTitle
-"""
+$umlBody
+@enduml""".trimIndent()
+
+    fun <T> group(group: String, function: () -> T): T {
+        umlBody.append("group $group\n")
+        return function().also {
+            umlBody.append("end\n")
+        }
+    }
+
+}
+
+class UmlCommandHandler<C : Command, S : StateWithId, T : Transition>(
+    val delegate: CommandHandler<C, S, T>,
+    val umlRenderer: UmlRenderer
+) : CommandHandler<C, S, T> {
+
     var step = 0
 
     override fun invoke(command: C): Result<ErrorCode, Application<S, T>> {
         step++
-        uml += """
+        umlRenderer.append(
+            """
             |group ${command::class.simpleName}
             |""".trimMargin()
+        )
         val result = delegate.invoke(command)
             .onEach { application ->
-                uml += application.applied
+                umlRenderer.append(application.applied
                     .mapIndexed { index, it ->
-                        """  ${application.stateHistory[index]::class.simpleName} -> ${application.state::class.simpleName} : ${it::class.simpleName}"
+                        """  ${application.stateHistory[index]::class.simpleName} -> ${application.state::class.simpleName} : ${it::class.simpleName}
                             |""".trimMargin()
                     }
                     .joinToString("\n") +
-                        "\n"
+                        "\n")
             }
-        uml += "end\n"
+        umlRenderer.append("end\n")
         return result
-    }
-
-    fun uml(): String {
-        return uml + """@enduml"""
     }
 }

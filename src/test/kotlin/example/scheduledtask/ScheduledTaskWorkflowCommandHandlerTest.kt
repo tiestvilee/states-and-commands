@@ -3,6 +3,7 @@ package example.scheduledtask
 import commandhandler.InMemoryPersistence
 import commandhandler.PersistentCommandHandler
 import commandhandler.UmlCommandHandler
+import commandhandler.UmlRenderer
 import functional.map
 import functional.orThrow
 import org.junit.Assert.assertEquals
@@ -31,7 +32,8 @@ class ScheduledTaskWorkflowCommandHandlerTest {
             commandHandler,
             datasource::save
         )
-        val dottyHandler = UmlCommandHandler(persistentHandler, object {}.javaClass.enclosingMethod.name)
+        val umlRenderer = UmlRenderer(object {}.javaClass.enclosingMethod.name)
+        val dottyHandler = UmlCommandHandler(persistentHandler, umlRenderer)
 
         val handler = dottyHandler
 
@@ -52,7 +54,7 @@ class ScheduledTaskWorkflowCommandHandlerTest {
         assertEquals(CompleteTask(entityId), state)
 
         File("src/test/kotlin/example/scheduledtask/command.puml")
-            .writeText(dottyHandler.uml())
+            .writeText(umlRenderer.toUml())
     }
 }
 

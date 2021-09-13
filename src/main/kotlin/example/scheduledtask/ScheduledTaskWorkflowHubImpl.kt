@@ -1,6 +1,7 @@
 package example.scheduledtask
 
 import commandhandler.CommandHandler
+import commandhandler.UmlRenderer
 import functional.ErrorCode
 import functional.Result
 import functional.flatMapFailure
@@ -39,12 +40,33 @@ class PendingJobsProjection(val clock: Clock) {
 
 data class JobFailure(val message: String) : ErrorCode
 
-class ScheduledTaskWorkflowHub(
+interface ScheduledTaskWorkflowHub {
+    fun createTask(task: ScheduledTask): Result<ErrorCode, Application<ScheduledTaskWorkflowState, ScheduledTaskWorkflowEvent>>
+    fun runPendingTasks()
+}
+
+class UmlScheduledTaskWorflowHub(val delegate: ScheduledTaskWorkflowHub, val umlRenderer: UmlRenderer) :
+    ScheduledTaskWorkflowHub {
+    override fun createTask(task: ScheduledTask): Result<ErrorCode, Application<ScheduledTaskWorkflowState, ScheduledTaskWorkflowEvent>> {
+        return umlRenderer.group("createTask") {
+            delegate.createTask(task)
+        }
+    }
+
+    override fun runPendingTasks() {
+        umlRenderer.group("runPendingTasks") {
+            delegate.runPendingTasks()
+        }
+    }
+
+}
+
+class ScheduledTaskWorkflowHubImpl(
     val originalCommandHandler: CommandHandler<ScheduledTaskWorkflowCommand, ScheduledTaskWorkflowState, ScheduledTaskWorkflowEvent>,
     val pendingJobs: PendingJobsProjection,
     val jobHandler: (URI) -> Result<ErrorCode, ScheduledTask?>,
-) {
-    val commandHandler =
+) : ScheduledTaskWorkflowHub {
+    private val commandHandler =
         object : CommandHandler<ScheduledTaskWorkflowCommand, ScheduledTaskWorkflowState, ScheduledTaskWorkflowEvent> {
             override fun invoke(command: ScheduledTaskWorkflowCommand): Result<ErrorCode, Application<ScheduledTaskWorkflowState, ScheduledTaskWorkflowEvent>> {
                 return originalCommandHandler.invoke(command).map { application ->
@@ -54,10 +76,10 @@ class ScheduledTaskWorkflowHub(
             }
         }
 
-    fun createTask(task: ScheduledTask) =
+    override fun createTask(task: ScheduledTask) =
         commandHandler.invoke(CreatePendingTask(task))
 
-    fun runPendingTasks() {
+    override fun runPendingTasks() {
         pendingJobs.map { job: PendingJob ->
             commandHandler.invoke(StartTask(job.id))
                 .map { application: Application<ScheduledTaskWorkflowState, ScheduledTaskWorkflowEvent> ->
