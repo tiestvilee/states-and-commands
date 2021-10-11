@@ -1,0 +1,31 @@
+@startuml
+' skinparam responseMessageBelowArrow true
+title can call a bunch of hub endpoints
+group createTask
+group CreatePendingTask
+  NotFound -> PendingTask : ScheduledTaskWorkflowCreated
+
+end
+end
+group runPendingTasks
+group StartTask
+  PendingTask -> ExecutingTask : TaskStarted
+
+end
+group RecordTaskSuccessAndExtend
+  ExecutingTask -> PendingTask : TaskExtended
+
+end
+end
+group runPendingTasks
+group StartTask
+  PendingTask -> ExecutingTask : TaskStarted
+
+end
+group RecordTaskSuccessAndComplete
+  ExecutingTask -> CompleteTask : TaskCompleted
+
+end
+end
+
+@enduml

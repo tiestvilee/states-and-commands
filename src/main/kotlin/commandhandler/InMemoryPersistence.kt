@@ -16,4 +16,13 @@ class InMemoryPersistence<T : Transition> {
     fun fetchTransitionsFor(id: StateId): Result<ErrorCode, List<T>> {
         return data.filter { it.first == id }.map { it.second }.asSuccess()
     }
+
+    fun <S> fetchTransitionsForAllStates(param: (StateId, List<T>) -> S): List<S> {
+        return data.fold(mapOf<StateId, List<T>>()) { acc, pair ->
+            val orig = acc.getOrDefault(pair.first, emptyList())
+            acc + (pair.first to (orig + pair.second))
+        }.map {
+            param(it.key, it.value)
+        }
+    }
 }

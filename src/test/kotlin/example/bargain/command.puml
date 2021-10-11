@@ -1,0 +1,17 @@
+@startuml
+' skinparam responseMessageBelowArrow true
+title can apply a bunch of commands
+group CreateBargain
+  NotFound -> WaitingForAcceptance : SellerOfferedBargain
+
+end
+group AcceptBargain
+WaitingForTransaction -> DeliveryService : start transaction
+DeliveryService -> WaitingForTransaction : transactionId
+  WaitingForAcceptance -> WaitingForTransaction : AcceptedBargain
+
+  WaitingForTransaction -> TransactionCreated : TransactionStarted
+
+end
+
+@enduml

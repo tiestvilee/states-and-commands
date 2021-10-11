@@ -45,7 +45,9 @@ class UmlCommandHandler<C : Command, S : StateWithId, T : Transition>(
             .onEach { application ->
                 umlRenderer.append(application.applied
                     .mapIndexed { index, it ->
-                        """  ${application.stateHistory[index]::class.simpleName} -> ${application.state::class.simpleName} : ${it::class.simpleName}
+                        val toStateName =
+                            if (index + 1 < application.stateHistory.size) application.stateHistory[index + 1]::class.simpleName else application.state::class.simpleName
+                        """  ${application.stateHistory[index]::class.simpleName} -> $toStateName : ${it::class.simpleName}
                             |""".trimMargin()
                     }
                     .joinToString("\n") +

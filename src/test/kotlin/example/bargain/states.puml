@@ -1,0 +1,10 @@
+@startuml
+  [*] --> NotFound
+  NotFound --> WaitingForAcceptance : SellerOfferedBargain
+  WaitingForAcceptance --> Rejected : RejectedBargain
+  WaitingForAcceptance --> WaitingForTransaction : AcceptedBargain
+  WaitingForTransaction --> TransactionCreated : TransactionStarted
+  WaitingForTransaction --> Rejected : RejectedBargain
+  Rejected --> [*]
+  TransactionCreated --> [*]
+@enduml
